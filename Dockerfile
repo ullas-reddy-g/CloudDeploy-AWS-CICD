@@ -6,11 +6,17 @@
 
 FROM python:3.11-slim
 
+# Build-time arguments
+ARG APP_VERSION=1.0.0
+ARG DEPLOYMENT_ID=local-build
+
 # Prevent Python from writing .pyc files and enable unbuffered logging
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000 \
-    ENVIRONMENT=production
+    ENVIRONMENT=production \
+    APP_VERSION=${APP_VERSION} \
+    DEPLOYMENT_ID=${DEPLOYMENT_ID}
 
 # Install essential runtime utilities and create unprivileged application user
 RUN apt-get update \

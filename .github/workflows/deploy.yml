@@ -49,6 +49,7 @@ jobs:
           echo "Building image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
           docker build \
             --build-arg APP_VERSION=${{ steps.vars.outputs.IMAGE_TAG }} \
+            --build-arg DEPLOYMENT_ID=${{ steps.vars.outputs.IMAGE_TAG }} \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             .
@@ -97,10 +98,13 @@ jobs:
 
       - name: Verify Application Health Check
         if: ${{ vars.APP_PUBLIC_URL != '' }}
+        env:
+          APP_PUBLIC_URL: ${{ vars.APP_PUBLIC_URL }}
         run: |
-          echo "Probing application health check at ${{ vars.APP_PUBLIC_URL }}/health..."
+          TARGET_URL="${APP_PUBLIC_URL%/}/health"
+          echo "Probing application health check at $TARGET_URL..."
           for i in {1..6}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ vars.APP_PUBLIC_URL }}/health" || echo "000")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$TARGET_URL" || echo "000")
             if [ "$STATUS" -eq 200 ]; then
               echo "Health check succeeded: HTTP 200"
               exit 0

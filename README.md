@@ -229,19 +229,34 @@ python -m flake8 app/ tests/ --max-line-length=120
 
 ### Verified Test Results:
 ```text
-tests/test_app.py::test_homepage_status_and_content PASSED               [ 10%]
-tests/test_app.py::test_deployment_page PASSED                           [ 20%]
-tests/test_app.py::test_about_page PASSED                                [ 30%]
-tests/test_app.py::test_404_not_found_html PASSED                        [ 40%]
-tests/test_app.py::test_404_not_found_json PASSED                        [ 50%]
-tests/test_app.py::test_500_error_handling PASSED                        [ 60%]
-tests/test_app.py::test_security_headers_present PASSED                  [ 70%]
-tests/test_health.py::test_health_endpoint_status PASSED                 [ 80%]
-tests/test_health.py::test_health_endpoint_payload PASSED                [ 90%]
+tests/test_app.py::test_homepage_status_and_content PASSED               [  6%]
+tests/test_app.py::test_deployment_page PASSED                           [ 12%]
+tests/test_app.py::test_about_page PASSED                                [ 18%]
+tests/test_app.py::test_404_not_found_html PASSED                        [ 25%]
+tests/test_app.py::test_404_not_found_json PASSED                        [ 31%]
+tests/test_app.py::test_500_error_handling_json PASSED                   [ 37%]
+tests/test_app.py::test_500_error_handling_html PASSED                   [ 43%]
+tests/test_app.py::test_error_trigger_forbidden_when_not_debug PASSED    [ 50%]
+tests/test_app.py::test_security_headers_present PASSED                  [ 56%]
+tests/test_app.py::test_get_uptime_seconds_helper PASSED                 [ 62%]
+tests/test_app.py::test_is_running_in_docker_helper PASSED               [ 68%]
+tests/test_app.py::test_create_app_env_overrides PASSED                  [ 75%]
+tests/test_app.py::test_create_app_default_config PASSED                 [ 81%]
+tests/test_health.py::test_health_endpoint_status PASSED                 [ 87%]
+tests/test_health.py::test_health_endpoint_payload PASSED                [ 93%]
 tests/test_health.py::test_api_info_endpoint PASSED                      [100%]
 
-============================= 10 passed in 0.30s ==============================
-Coverage: 89%
+---------- coverage: platform win32, python 3.11.5 -----------
+Name              Stmts   Miss  Cover
+-------------------------------------
+app\__init__.py      50      0   100%
+app\config.py        25      0   100%
+app\routes.py        48      0   100%
+-------------------------------------
+TOTAL               123      0   100%
+
+============================= 16 passed in 0.95s ==============================
+Coverage: 100%
 Flake8 Violations: 0
 ```
 

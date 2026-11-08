@@ -41,8 +41,8 @@ jobs:
         run: |
           pytest -v --cov=app --cov-report=term-missing --cov-fail-under=80
 
-  docker-build:
-    name: Container Build Verification
+  docker-verify:
+    name: Container Build & Runtime Verification
     needs: lint-and-test
     runs-on: ubuntu-latest
 
@@ -59,6 +59,58 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
-          tags: clouddeploy:test-${{ github.sha }}
+          load: true
+          tags: clouddeploy:ci-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Test Container Execution & Health Endpoint
+        run: |
+          echo "Starting application container in background..."
+          docker run -d --name clouddeploy-test -p 8000:8000 clouddeploy:ci-test
+
+          echo "Awaiting container startup..."
+          sleep 5
+
+          echo "Probing container health endpoint..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health || echo "000")
+          echo "Container HTTP status: $STATUS"
+          if [ "$STATUS" -ne 200 ]; then
+            echo "ERROR: Health check returned HTTP $STATUS"
+            docker logs clouddeploy-test
+            exit 1
+          fi
+
+          echo "Verifying unprivileged non-root execution (UID 10001)..."
+          USER_ID=$(docker exec clouddeploy-test id -u)
+          echo "Container runtime UID: $USER_ID"
+          if [ "$USER_ID" -ne 10001 ]; then
+            echo "ERROR: Expected non-root UID 10001, got $USER_ID"
+            exit 1
+          fi
+
+          docker stop clouddeploy-test
+          docker rm clouddeploy-test
+          echo "Standalone container validation PASSED."
+
+      - name: Test Docker Compose Multi-Container Setup (App + Nginx)
+        run: |
+          echo "Validating Docker Compose orchestration..."
+          docker compose up -d --build
+
+          echo "Awaiting services and proxy initialization..."
+          sleep 12
+
+          echo "Probing health check via Nginx reverse proxy (Port 80)..."
+          NGINX_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:80/health || echo "000")
+          echo "Nginx proxy HTTP status: $NGINX_STATUS"
+
+          if [ "$NGINX_STATUS" -ne 200 ]; then
+            echo "ERROR: Nginx proxy health check returned HTTP $NGINX_STATUS"
+            docker compose logs
+            docker compose down
+            exit 1
+          fi
+
+          echo "Nginx reverse proxy validation PASSED."
+          docker compose down

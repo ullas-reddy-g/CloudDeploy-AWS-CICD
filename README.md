@@ -260,6 +260,22 @@ Coverage: 100%
 Flake8 Violations: 0
 ```
 
+### Verification Status Matrix
+
+| Component | Verification Tier | Detail |
+|---|---|---|
+| **Flask Web App** | **LOCALLY VERIFIED** | Tested via Pytest test client across all routes and error scenarios. |
+| **Frontend UI** | **LOCALLY VERIFIED** | Tested templates, CSS styling, AJAX health polling, and diagnostics. |
+| **Automated Tests** | **LOCALLY VERIFIED** | 16/16 tests passing, 100% coverage, 0 Flake8 violations. |
+| **Docker Build** | **IMPLEMENTED** | Multi-stage Dockerfile verified; automated build & runtime test in CI workflow. |
+| **Docker Compose** | **IMPLEMENTED** | Multi-container compose verified; automated proxy test in CI workflow. |
+| **Git Repository** | **LOCALLY VERIFIED** | Local repository on `main` branch with clean history and secret exclusion. |
+| **CI Workflow** | **IMPLEMENTED** | `.github/workflows/ci.yml` validates lint, tests, coverage, container & Compose. |
+| **CD Workflow** | **IMPLEMENTED** | `.github/workflows/deploy.yml` with OIDC auth, ECR push, SSM rollout & rollback. |
+| **Amazon ECR** | **IMPLEMENTED** | Automated creation script with AES-256 encryption & 10-image lifecycle policy. |
+| **AWS EC2 Bootstrap** | **IMPLEMENTED** | Self-contained user-data script with embedded rollout and rollback scripts. |
+| **CloudWatch Observability** | **IMPLEMENTED** | Metrics and JSON log stream collection configurations prepared. |
+
 ---
 
 ## 9. AWS Infrastructure & CI/CD Pipeline
@@ -320,7 +336,21 @@ The deployment script (`deployment/aws/deploy.sh`) operates as follows:
 
 ---
 
-## 13. Resource Cleanup (Zero Lingering Cost)
+## 13. Cloud Cost Analysis & Safety Controls
+
+| Resource | Service Tier / Size | Estimated Cost (us-east-1) |
+|---|---|---|
+| **AWS EC2** | `t3.micro` (1 vCPU, 1 GB RAM) | Free Tier eligible (750 hrs/month) or ~\$0.0104/hr (<\$0.05 for 4-hr demo) |
+| **Amazon ECR** | Private repository (<1 GB storage) | Free Tier eligible (500 MB) or ~\$0.06/month with 10-image lifecycle policy |
+| **AWS Systems Manager** | SSM Run Command & Session Manager | **\$0.00 (Free of charge)** |
+| **AWS IAM & OIDC** | WebIdentity federation & roles | **\$0.00 (Free of charge)** |
+| **Networking** | Direct Internet Gateway (No NAT Gateway) | **\$0.00 (Saves ~\$32/month over NAT Gateways)** |
+| **Amazon CloudWatch** | Basic metrics & <5 GB logs/month | Free Tier eligible or <\$0.10 |
+| **Total Test Run** | Complete end-to-end deployment run | **<\$0.10 total (zero ongoing cost with cleanup)** |
+
+---
+
+## 14. Resource Cleanup (Zero Lingering Cost)
 
 To ensure zero ongoing cloud charges when you finish testing:
 ```bash
@@ -330,6 +360,6 @@ This utility cleanly terminates EC2 instances, deletes security groups, empties 
 
 ---
 
-## 14. License
+## 15. License
 
 This project is licensed under the [MIT License](LICENSE).

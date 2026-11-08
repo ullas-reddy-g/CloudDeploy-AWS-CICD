@@ -3,7 +3,7 @@
 ## 1. Project Objectives
 - Build a production-grade, containerized Flask web application with Gunicorn and Nginx reverse proxy.
 - Provide comprehensive application health, metrics, and deployment information endpoints.
-- Establish an automated testing pipeline using Pytest and Flask test client.
+- Establish an automated testing pipeline using Pytest and Flask test client with 100% test coverage.
 - Implement Continuous Integration (CI) with GitHub Actions (linting, testing, Docker build verification).
 - Implement Continuous Deployment (CD) with GitHub Actions using AWS OIDC authentication, Amazon ECR container repository, and AWS EC2 automated deployment with rollback capability.
 - Configure cloud security: least-privilege IAM policies, OIDC trust policies without hardcoded AWS access keys, non-root container execution, and CloudWatch observability.
@@ -14,7 +14,7 @@
 ```
 Developer Commit / PR
         ↓
-GitHub Actions (CI Workflow: Flake8 + Pytest 100% Coverage + Docker Build)
+GitHub Actions (CI Workflow: Flake8 + Pytest 100% Coverage + Docker Build & Compose Check)
         ↓
 GitHub Actions (CD Workflow: AWS OIDC STS Authentication)
         ↓
@@ -33,13 +33,13 @@ Amazon CloudWatch (Metrics & Centralized JSON Log Ingestion)
 
 ### Phase 1: Environment & Workspace Inspection
 - [x] Inspect local workspace and directory structure (all 41 files audited).
-- [x] Check installed developer tooling (Python 3.11.5, Git 2.56.0, Pip 25.0.1; Docker Desktop and AWS CLI not locally installed in Windows environment).
+- [x] Check installed developer tooling (Python 3.11.5, Git 2.56.0, Pip 25.0.1; Docker Desktop, AWS CLI, and GitHub CLI not locally installed in Windows environment).
 - [x] Initialize Git repository with `main` branch.
-- [x] Create and maintain `PROJECT_PROGRESS.md` tracking log.
+- [x] Maintain accurate `PROJECT_PROGRESS.md` tracking log.
 
 ### Phase 2: Application Development (Flask + Gunicorn + Modern UI)
 - [x] Create application directory structure (`app/`, `templates/`, `static/`).
-- [x] Implement `app/config.py` with environment variable management.
+- [x] Implement `app/config.py` with multi-environment configuration management.
 - [x] Implement `app/__init__.py` application factory and security headers.
 - [x] Implement `app/routes.py` with endpoints:
   - `GET /` (Home dashboard with KPI cards)
@@ -57,7 +57,7 @@ Amazon CloudWatch (Metrics & Centralized JSON Log Ingestion)
 - [x] Implement route, UI, navigation, and error handler tests in `tests/test_app.py`.
 - [x] Implement health and non-sensitive API tests in `tests/test_health.py`.
 - [x] Execute `pytest -v` and verify 100% test pass rate locally:
-  - **16/16 tests passed** in `0.95s`
+  - **16/16 tests passed** in `0.92s`
   - **100% statement coverage** across all application modules (`app/__init__.py`, `app/config.py`, `app/routes.py`)
   - **0 Flake8 lint violations**
 
@@ -68,7 +68,7 @@ Amazon CloudWatch (Metrics & Centralized JSON Log Ingestion)
 - [x] Create `docker-compose.yml` orchestrating web application and Nginx reverse proxy with healthcheck dependencies.
 
 ### Phase 5: CI/CD Workflows (GitHub Actions)
-- [x] Create `.github/workflows/ci.yml` for automated linting, tests with coverage enforcement (>=80%), and Docker build verification.
+- [x] Create `.github/workflows/ci.yml` for automated linting, tests with coverage enforcement (>=80%), Docker image build, container health check test, and Docker Compose validation.
 - [x] Create `.github/workflows/deploy.yml` with AWS OIDC authentication, ECR push, EC2 deployment via AWS SSM, healthcheck verification, and rollback logic.
 
 ### Phase 6: AWS Infrastructure, Security & Deployment Scripts
@@ -87,26 +87,43 @@ Amazon CloudWatch (Metrics & Centralized JSON Log Ingestion)
 
 ---
 
-## 4. End-to-End Verification Report
+## 4. End-to-End Verification Matrix
 
-| Component | Status | Evidence |
+*Status legend:*
+- `LOCALLY VERIFIED`: Executed and validated on local workstation.
+- `IMPLEMENTED`: Fully authored, configured, and ready for execution in CI/cloud.
+- `GITHUB VERIFIED`: Validated via GitHub remote repository execution (Pending remote link).
+- `AWS VERIFIED`: Validated on live AWS cloud resources (Pending user AWS authorization).
+
+| Component | Status | Verification Detail / Evidence |
 |---|---|---|
-| **Flask application** | PASS | Modular Flask 3.0 factory with Gunicorn, routes, error handlers, and structured logging. Tested via pytest and local test client. |
-| **Frontend** | PASS | Responsive Bootstrap 5.3 UI with dark theme, live health polling, KPI cards, and diagnostics panel. |
-| **Automated tests** | PASS | Pytest test suite executed: 16/16 passed in 0.95s, **100% coverage**, 0 flake8 errors. |
-| **Docker build** | PASS | Production multi-stage Dockerfile verified with non-root user (UID 10001), healthcheck, build-arg injection, and Gunicorn entrypoint. |
-| **Docker Compose** | PASS | `docker-compose.yml` orchestrates web application and Nginx reverse proxy with container networking and healthcheck dependencies. |
-| **GitHub repository** | PASS | Git repository initialized on `main` branch, `.gitignore` excludes cache/secrets, ready for remote push. |
-| **CI workflow** | PASS | `.github/workflows/ci.yml` validates flake8 linting, pytest with >=80% coverage, and Docker buildx action. |
-| **ECR** | PASS | Automated ECR provisioning script with AES-256 encryption, image scan-on-push, and 10-image lifecycle policy (`deployment/scripts/ecr-setup.sh`). |
-| **EC2** | PASS | Production Ubuntu 24.04/22.04 LTS user-data initialization script with Docker, Nginx, SSM, and CloudWatch Agent (`deployment/aws/ec2-user-data.sh`). |
-| **OIDC authentication** | PASS | GitHub Actions OIDC federation policy (`deployment/aws/github-oidc-trust-policy.json`) and least-privilege IAM policy without long-lived access keys. |
-| **Automated deployment** | PASS | CD workflow (`deploy.yml`) with automated SSM rollout, health probe validation, and self-healing rollback (`deployment/aws/rollback.sh`). |
-| **Nginx** | PASS | Reverse proxy configuration (`nginx/nginx.conf`) with CloudWatch JSON logging, security headers, buffering, and upstream health pass-through. |
-| **CloudWatch** | PASS | CloudWatch Agent configuration (`deployment/aws/cloudwatch-agent-config.json`) for CPU, RAM, disk metrics, and access/error log ingestion. |
+| **Flask Application** | **LOCALLY VERIFIED** | Factory pattern, routes, error handlers, and structured logging. Tested via pytest and local test client. |
+| **Frontend UI** | **LOCALLY VERIFIED** | Bootstrap 5.3 UI templates, CSS styling, AJAX health polling, KPI cards, and diagnostics panel. |
+| **Automated Tests** | **LOCALLY VERIFIED** | 16/16 tests passing in 0.92s, **100% statement coverage**, 0 flake8 errors. |
+| **Docker Build** | **IMPLEMENTED** | Multi-stage Dockerfile with UID 10001, Python 3.11-slim, Gunicorn WSGI. Automated verification configured in `ci.yml`. |
+| **Docker Compose** | **IMPLEMENTED** | `docker-compose.yml` orchestrates web app + Nginx proxy with service health dependencies. Automated verification configured in `ci.yml`. |
+| **Local Git Repository** | **LOCALLY VERIFIED** | Git repository initialized on `main` branch with clean history and `.gitignore` preventing secret leakage. |
+| **GitHub Actions CI** | **IMPLEMENTED** | `.github/workflows/ci.yml` validates flake8, pytest (>=80% cov), container build, and Compose proxy test. |
+| **GitHub Actions CD** | **IMPLEMENTED** | `.github/workflows/deploy.yml` with OIDC auth, ECR push, SSM dispatch, health validation, and rollback. |
+| **Amazon ECR** | **IMPLEMENTED** | Automated provisioning script (`ecr-setup.sh`) with AES-256 encryption, scan-on-push, and 10-image lifecycle policy. |
+| **AWS EC2 Bootstrap** | **IMPLEMENTED** | Self-contained user-data script (`ec2-user-data.sh`) installing Docker, Nginx, SSM, and CloudWatch agent with embedded deployment scripts. |
+| **OIDC Authentication** | **IMPLEMENTED** | IAM trust policy (`github-oidc-trust-policy.json`) and least-privilege IAM policy without long-lived access keys. |
+| **Automated Rollback** | **IMPLEMENTED** | `deploy.sh` verifies `/health` and automatically invokes `rollback.sh` on failure to restore previous stable image. |
+| **Nginx Reverse Proxy** | **IMPLEMENTED** | Reverse proxy configuration (`nginx/nginx.conf`) with CloudWatch JSON logging, security headers, and upstream health pass-through. |
+| **CloudWatch Observability**| **IMPLEMENTED** | CloudWatch Agent configuration (`cloudwatch-agent-config.json`) for CPU, RAM, disk metrics, and access/error log ingestion. |
 
 ---
 
 ## 5. Tooling & AWS Environment Status
-1. **Local Host Tooling**: Python 3.11.5, Git 2.56.0, Pip 25.0.1, Pytest 9.1.1, Flake8 7.1.0 are operational. Local Docker daemon, AWS CLI, and GitHub CLI are not installed on the Windows host; container build and remote deployment are verified via GitHub Actions runners and EC2 user-data.
-2. **AWS Cost & Safety Policy (Rule 18)**: Zero billable cloud resources were created without authorization. Complete deployment scripts, IAM policies, and a zero-lingering-cost teardown script (`deployment/aws/cleanup.sh`) are provided.
+1. **Local Workstation Tooling**:
+   - Python 3.11.5: Installed & Operational
+   - Pip 25.0.1: Installed & Operational
+   - Git 2.56.0: Installed & Operational
+   - Pytest 9.1.1: Installed & Operational (16/16 Passed, 100% Coverage)
+   - Flake8 7.1.0: Installed & Operational (0 Violations)
+   - Docker Desktop: Not Installed on Local Windows Workstation (Execution automated via GitHub Actions runner)
+   - AWS CLI: Not Installed on Local Windows Workstation
+   - GitHub CLI: Not Installed on Local Windows Workstation
+2. **AWS Cost & Safety Policy (Rule 18)**:
+   - In accordance with safety rules, zero billable cloud resources were created without authorization.
+   - A dedicated decommissioning utility (`deployment/aws/cleanup.sh`) is provided for immediate resource termination post-testing.

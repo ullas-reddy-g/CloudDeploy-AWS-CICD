@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Deployment Diagnostics | CloudDeploy{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Header -->
+    <div class="col-12">
+        <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 border-bottom border-secondary">
+            <div>
+                <h2 class="fw-bold text-white mb-1">Deployment & Infrastructure Diagnostics</h2>
+                <p class="text-secondary mb-0">Live containerized runtime metrics and deployment validation indicators.</p>
+            </div>
+            <div class="d-flex gap-2 mt-2 mt-md-0">
+                <button id="refreshHealthBtn" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-arrow-clockwise"></i> Probe Health
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deployment Status Overview -->
+    <div class="col-lg-7">
+        <div class="card border-secondary h-100">
+            <div class="card-header bg-surface border-bottom border-secondary py-3">
+                <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
+                    <i class="bi bi-info-circle text-primary"></i> Current Deployment Parameters
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 align-middle">
+                        <tbody>
+                            <tr>
+                                <th class="text-secondary ps-4 py-3" style="width: 35%;">Application Name</th>
+                                <td class="fw-bold text-white">{{ info.app_name }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-secondary ps-4 py-3">Release Version</th>
+                                <td>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                        v{{ info.version }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-secondary ps-4 py-3">Deployment Identifier</th>
+                                <td><code>{{ info.deployment_id if info.deployment_id else 'Unavailable' }}</code></td>
+                            </tr>
+                            <tr>
+                                <th class="text-secondary ps-4 py-3">Deployment Environment</th>
+                                <td>
+                                    <span class="badge bg-info-subtle text-info border border-info-subtle text-uppercase">
+                                        {{ info.environment }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-secondary ps-4 py-3">Containerized State</th>
+                                <td>
+                                    {% if info.is_container %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                        <i class="bi bi-check-circle-fill me-1"></i> Running inside Docker Container
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-secondary-subtle text-light border border-secondary">
+                                        <i class="bi bi-laptop me-1"></i> Running directly on Host System
+                                    </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-secondary ps-4 py-3">Service Start Time</th>
+                                <td class="text-light">{{ info.start_time }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-secondary ps-4 py-3">App Uptime</th>
+                                <td id="uptimeCounter" class="text-light">{{ info.uptime_seconds }} seconds</td>
+                            </tr>
+                            <tr>
+                                <th class="text-secondary ps-4 py-3">AWS Region Target</th>
+                                <td>
+                                    <span class="badge bg-secondary-subtle text-warning border border-secondary">
+                                        {{ info.aws_region }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Health & Endpoint Verification -->
+    <div class="col-lg-5">
+        <div class="card border-secondary h-100">
+            <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
+                    <i class="bi bi-heart-pulse text-danger"></i> Live Health Check Response
+                </h5>
+                <span id="healthResponseCode" class="badge bg-secondary">HTTP 200</span>
+            </div>
+            <div class="card-body">
+                <p class="text-secondary small mb-3">
+                    Probing <code>GET /health</code> endpoint locally or via Nginx reverse proxy.
+                </p>
+                <pre class="bg-black text-success p-3 rounded border border-secondary mb-3 small" style="min-height: 140px;" id="healthJsonOutput">
+Loading health probe payload...
+                </pre>
+                <div class="d-flex justify-content-between align-items-center text-secondary small">
+                    <span>Latency: <strong id="healthLatency" class="text-white">-</strong></span>
+                    <span>Last Checked: <strong id="healthLastChecked" class="text-white">-</strong></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security & Architecture Isolation Notice -->
+    <div class="col-12">
+        <div class="alert alert-dark border-secondary d-flex align-items-start gap-3 mb-0" role="alert">
+            <i class="bi bi-shield-check text-success fs-4 mt-1"></i>
+            <div>
+                <h6 class="alert-heading fw-bold mb-1">Security Isolation Policy Active</h6>
+                <p class="mb-0 small text-secondary">
+                    In compliance with production cloud security guidelines, all AWS credentials, session tokens, internal VPC subnets, and host identities are isolated. GitHub Actions uses OIDC short-lived credentials, and the EC2 runtime uses IAM instance profiles without long-lived access keys.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

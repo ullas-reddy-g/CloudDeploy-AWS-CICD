@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}500 - Internal Server Error | CloudDeploy{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-8 col-lg-6 text-center">
+        <div class="p-5 rounded-4 bg-surface border border-danger shadow-lg">
+            <div class="display-1 fw-bold text-danger mb-3">500</div>
+            <h3 class="text-white fw-bold mb-3">Internal Server Error</h3>
+            <p class="text-secondary mb-4">
+                The application encountered an unexpected internal condition. An incident diagnostic log has been recorded to stdout for Amazon CloudWatch analysis.
+            </p>
+            <div class="d-flex justify-content-center gap-3">
+                <a href="{{ url_for('main.index') }}" class="btn btn-primary px-4">
+                    <i class="bi bi-house-door me-2"></i> Return to Dashboard
+                </a>
+                <a href="/deployment" class="btn btn-outline-secondary px-4">
+                    <i class="bi bi-speedometer2 me-2"></i> Deployment Diagnostics
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

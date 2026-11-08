@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | CloudDeploy{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Hero Banner -->
+    <div class="col-12">
+        <div class="card card-hero border-0 shadow-lg p-4 p-md-5">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 mb-3 fs-sm">
+                        <i class="bi bi-patch-check-fill"></i> Continuous Integration & Automated AWS Deployment
+                    </div>
+                    <h1 class="display-5 fw-bold text-white mb-3">CloudDeploy Platform</h1>
+                    <p class="lead text-secondary-emphasis mb-4">
+                        Automated cloud deployment pipeline running Python Flask inside containerized Docker environments, reverse-proxied by Nginx, and orchestrated on AWS EC2 with GitHub Actions & Amazon ECR.
+                    </p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a href="{{ url_for('main.deployment') }}" class="btn btn-primary px-4 py-2">
+                            <i class="bi bi-speedometer2 me-2"></i> Deployment Status
+                        </a>
+                        <a href="{{ url_for('main.about') }}" class="btn btn-outline-light px-4 py-2">
+                            <i class="bi bi-diagram-3 me-2"></i> Architecture Overview
+                        </a>
+                        <a href="/api/info" target="_blank" class="btn btn-outline-info px-4 py-2">
+                            <i class="bi bi-code-slash me-2"></i> /api/info
+                        </a>
+                    </div>
+                </div>
+                <div class="col-lg-4 text-center d-none d-lg-block">
+                    <div class="cloud-icon-container">
+                        <i class="bi bi-cloud-check display-1 text-primary opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Status KPI Cards -->
+    <div class="col-md-6 col-xl-3">
+        <div class="card status-card h-100 border-secondary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <span class="text-secondary small fw-bold text-uppercase">Application State</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">HEALTHY</span>
+                </div>
+                <h3 class="fw-bold text-white mb-1">{{ info.app_name }}</h3>
+                <span class="text-secondary small">Flask &bull; Gunicorn WSGI</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card status-card h-100 border-secondary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <span class="text-secondary small fw-bold text-uppercase">Release Version</span>
+                    <span class="badge bg-info-subtle text-info border border-info-subtle">PROD</span>
+                </div>
+                <h3 class="fw-bold text-white mb-1">v{{ info.version }}</h3>
+                <span class="text-secondary small">Deployment ID: <code>{{ info.deployment_id }}</code></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card status-card h-100 border-secondary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <span class="text-secondary small fw-bold text-uppercase">Environment</span>
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle text-uppercase">{{ info.environment }}</span>
+                </div>
+                <h3 class="fw-bold text-white mb-1">{{ info.aws_region }}</h3>
+                <span class="text-secondary small">Target AWS Region</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card status-card h-100 border-secondary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <span class="text-secondary small fw-bold text-uppercase">Runtime Mode</span>
+                    {% if info.is_container %}
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">DOCKER CONTAINER</span>
+                    {% else %}
+                    <span class="badge bg-secondary-subtle text-light border border-secondary">HOST SYSTEM</span>
+                    {% endif %}
+                </div>
+                <h3 class="fw-bold text-white mb-1">Python {{ info.python_version }}</h3>
+                <span class="text-secondary small">{{ info.os_platform }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- CI/CD Pipeline Flow Representation -->
+    <div class="col-12">
+        <div class="card border-secondary">
+            <div class="card-header bg-surface border-bottom border-secondary py-3">
+                <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
+                    <i class="bi bi-arrow-repeat text-primary"></i> Automated CI/CD Pipeline Workflow
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-3 text-center align-items-center">
+                    <div class="col-md-2">
+                        <div class="p-3 rounded bg-surface border border-secondary">
+                            <i class="bi bi-git text-danger fs-3 mb-2 d-block"></i>
+                            <div class="fw-semibold">1. Code Push</div>
+                            <small class="text-secondary">Git Commit / PR</small>
+                        </div>
+                    </div>
+                    <div class="col-md-1 d-none d-md-block text-secondary">
+                        <i class="bi bi-arrow-right fs-4"></i>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="p-3 rounded bg-surface border border-secondary">
+                            <i class="bi bi-shield-check text-info fs-3 mb-2 d-block"></i>
+                            <div class="fw-semibold">2. Pytest CI</div>
+                            <small class="text-secondary">Unit & API Tests</small>
+                        </div>
+                    </div>
+                    <div class="col-md-1 d-none d-md-block text-secondary">
+                        <i class="bi bi-arrow-right fs-4"></i>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="p-3 rounded bg-surface border border-secondary">
+                            <i class="bi bi-box-seam text-primary fs-3 mb-2 d-block"></i>
+                            <div class="fw-semibold">3. ECR Push</div>
+                            <small class="text-secondary">OIDC Docker Build</small>
+                        </div>
+                    </div>
+                    <div class="col-md-1 d-none d-md-block text-secondary">
+                        <i class="bi bi-arrow-right fs-4"></i>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 rounded bg-surface border border-primary">
+                            <i class="bi bi-hdd-network text-success fs-3 mb-2 d-block"></i>
+                            <div class="fw-semibold text-success">4. EC2 & Nginx</div>
+                            <small class="text-secondary">Automated Rollout</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

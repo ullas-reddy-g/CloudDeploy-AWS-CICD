@@ -1,0 +1,77 @@
+:root {
+    --bg-surface: #161b22;
+    --bg-card: #0d1117;
+    --border-color: #30363d;
+    --primary-accent: #2f81f7;
+    --success-accent: #238636;
+    --text-primary: #f0f6fc;
+    --text-secondary: #8b949e;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    background-color: #0d1117;
+    color: var(--text-primary);
+}
+
+.bg-surface {
+    background-color: var(--bg-surface) !important;
+}
+
+.border-secondary {
+    border-color: var(--border-color) !important;
+}
+
+.card-hero {
+    background: linear-gradient(135deg, #161b22 0%, #1c2128 50%, #161b22 100%);
+    border: 1px solid var(--border-color) !important;
+    border-radius: 1rem;
+}
+
+.status-card {
+    background-color: var(--bg-surface);
+    border-radius: 0.75rem;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.status-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-accent) !important;
+    box-shadow: 0 4px 20px rgba(47, 129, 247, 0.15);
+}
+
+.pulse-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: #2ea043;
+    border-radius: 50%;
+    animation: pulse 1.8s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.9);
+        box-shadow: 0 0 0 0 rgba(46, 160, 67, 0.7);
+    }
+    70% {
+        transform: scale(1.1);
+        box-shadow: 0 0 0 6px rgba(46, 160, 67, 0);
+    }
+    100% {
+        transform: scale(0.9);
+        box-shadow: 0 0 0 0 rgba(46, 160, 67, 0);
+    }
+}
+
+.fs-xs {
+    font-size: 0.75rem;
+}
+
+.fs-sm {
+    font-size: 0.85rem;
+}
+
+pre {
+    font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+}

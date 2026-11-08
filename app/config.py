@@ -11,6 +11,7 @@ class Config:
     PORT = int(os.getenv("PORT", "8000"))
     AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
     DEPLOYMENT_ID = os.getenv("DEPLOYMENT_ID", "local-build")
+    GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY", "ullas-reddy-g/CloudDeploy-AWS-CICD")
     START_TIME = datetime.now(timezone.utc)
     TESTING = False
     DEBUG = False

@@ -10,6 +10,7 @@ AWS_REGION="${2:-us-east-1}"
 APP_PORT="8000"
 APP_DIR="/opt/clouddeploy"
 LOG_FILE="/var/log/clouddeploy-deploy.log"
+HISTORY_FILE="$APP_DIR/deployment_history.json"
 
 exec > >(tee -a "$LOG_FILE") 2>&1
 
@@ -56,6 +57,30 @@ HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:${APP_PORT}
 if [ "$HTTP_CODE" -eq 200 ]; then
     echo "[$(date -u +'%Y-%m-%d %H:%M:%SZ')] Rollback SUCCESSFUL! Previous version restored and healthy (HTTP 200)."
     echo "$PREVIOUS_TAG" > "$APP_DIR/current_tag.txt"
+
+    # Record rollback in deployment history JSON
+    TIMESTAMP=$(date -u +'%Y-%m-%d %H:%M:%S UTC')
+    python3 -c "
+import json, sys
+entry = {
+    'deployment_id': sys.argv[1] + '-rollback',
+    'version': sys.argv[1],
+    'timestamp': sys.argv[2],
+    'environment': 'production',
+    'status': 'ROLLBACK',
+    'details': 'Restored previous stable container'
+}
+history = []
+try:
+    with open('$HISTORY_FILE', 'r') as f:
+        history = json.load(f)
+except Exception:
+    pass
+history.insert(0, entry)
+with open('$HISTORY_FILE', 'w') as f:
+    json.dump(history[:10], f, indent=2)
+" "$PREVIOUS_TAG" "$TIMESTAMP" 2>/dev/null || true
+
     exit 0
 else
     echo "CRITICAL: Rollback container failed health check (HTTP $HTTP_CODE)."

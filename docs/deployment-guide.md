@@ -51,7 +51,7 @@ Update `deployment/aws/github-oidc-trust-policy.json` with your AWS Account ID a
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:<YOUR_GITHUB_USER>/CloudDeploy-AWS-CICD:*"
+          "token.actions.githubusercontent.com:sub": "repo:ullas-reddy-g/CloudDeploy-AWS-CICD:*"
         }
       }
     }

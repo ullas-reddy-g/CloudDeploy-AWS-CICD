@@ -1,90 +1,286 @@
 {% extends "base.html" %}
 
-{% block title %}Deployment Diagnostics | CloudDeploy{% endblock %}
+{% block title %}Cloud Deployment & Monitoring Dashboard | CloudDeploy{% endblock %}
 
 {% block content %}
 <div class="row g-4">
-    <!-- Header -->
+    <!-- Header with Quick Action Buttons -->
     <div class="col-12">
         <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 border-bottom border-secondary">
             <div>
-                <h2 class="fw-bold text-white mb-1">Deployment & Infrastructure Diagnostics</h2>
-                <p class="text-secondary mb-0">Live containerized runtime metrics and deployment validation indicators.</p>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <h2 class="fw-bold text-white mb-0">Cloud Deployment & Monitoring Dashboard</h2>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Live Telemetry</span>
+                </div>
+                <p class="text-secondary mb-0">Comprehensive runtime metrics, container diagnostics, and AWS cloud topology monitoring.</p>
             </div>
-            <div class="d-flex gap-2 mt-2 mt-md-0">
+            <div class="d-flex gap-2 mt-3 mt-md-0">
                 <button id="refreshHealthBtn" class="btn btn-outline-primary btn-sm">
-                    <i class="bi bi-arrow-clockwise"></i> Probe Health
+                    <i class="bi bi-arrow-clockwise me-1"></i> Probe Health
                 </button>
+                <button id="refreshLogsBtn" class="btn btn-outline-info btn-sm">
+                    <i class="bi bi-terminal me-1"></i> Refresh Logs
+                </button>
+                <a href="https://github.com/{{ info.github_repo }}/actions" target="_blank" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-github me-1"></i> GitHub Actions
+                </a>
             </div>
         </div>
     </div>
 
-    <!-- Deployment Status Overview -->
-    <div class="col-lg-7">
+    <!-- Section G: Alerts & Notifications -->
+    <div class="col-12">
+        {% if info.alerts %}
+            <div class="d-flex flex-column gap-2">
+                {% for alert in info.alerts %}
+                <div class="alert alert-{{ alert.type }} bg-{{ alert.type }}-subtle border-{{ alert.type }}-subtle text-{{ alert.type }}-emphasis d-flex align-items-center justify-content-between mb-0 py-2 px-3 small rounded-3" role="alert">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi {% if alert.type == 'warning' %}bi-exclamation-triangle-fill{% elif alert.type == 'info' %}bi-info-circle-fill{% else %}bi-shield-shaded{% endif %}"></i>
+                        <strong>{{ alert.title }}:</strong> {{ alert.message }}
+                    </div>
+                    <span class="badge bg-{{ alert.type }} text-white text-uppercase" style="font-size: 0.7rem;">Active</span>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-success bg-success-subtle border-success-subtle text-success-emphasis d-flex align-items-center gap-2 mb-0 py-2 px-3 small rounded-3" role="alert">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>All systems operational. No active warnings or alerts.</span>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Section A: Overview Cards -->
+    <div class="col-md-6 col-xl-3">
+        <div class="card status-card h-100 border-secondary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="text-secondary small fw-bold text-uppercase">Service Health</span>
+                    <span id="overviewHealthBadge" class="badge bg-success-subtle text-success border border-success-subtle">OPERATIONAL</span>
+                </div>
+                <h4 class="fw-bold text-white mb-1">{{ info.app_name }}</h4>
+                <div class="text-secondary small">Uptime: <span id="uptimeDisplay">{{ info.uptime_seconds }}s</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card status-card h-100 border-secondary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="text-secondary small fw-bold text-uppercase">Release Version</span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">v{{ info.version }}</span>
+                </div>
+                <h4 class="fw-bold text-white mb-1"><code>{{ info.deployment_id }}</code></h4>
+                <div class="text-secondary small">Deployment Tag</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card status-card h-100 border-secondary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="text-secondary small fw-bold text-uppercase">Environment</span>
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle text-uppercase">{{ info.environment }}</span>
+                </div>
+                <h4 class="fw-bold text-white mb-1">{{ info.aws_region }}</h4>
+                <div class="text-secondary small">Target AWS Region</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card status-card h-100 border-secondary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="text-secondary small fw-bold text-uppercase">Runtime Mode</span>
+                    {% if info.is_container %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">DOCKER</span>
+                    {% else %}
+                    <span class="badge bg-secondary-subtle text-light border border-secondary">HOST PYTHON</span>
+                    {% endif %}
+                </div>
+                <h4 class="fw-bold text-white mb-1">{{ info.hostname }}</h4>
+                <div class="text-secondary small">Node Hostname</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section B & C: Docker & AWS Cloud Monitoring Row -->
+    <div class="col-lg-6">
+        <div class="card border-secondary h-100">
+            <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
+                    <i class="bi bi-box-seam text-info"></i> Section B: Docker Container Monitoring
+                </h5>
+                {% if info.is_container %}
+                <span class="badge bg-success">Container Healthy</span>
+                {% else %}
+                <span class="badge bg-secondary">Host Process</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <table class="table table-dark table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td class="text-secondary py-2">Container Status</td>
+                            <td class="text-end fw-semibold text-light">{{ info.container_status }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-secondary py-2">Execution Privilege</td>
+                            <td class="text-end text-light">
+                                {% if info.is_container %}
+                                <span class="badge bg-success-subtle text-success">Non-Root (UID 10001)</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Workstation User</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-secondary py-2">Docker Image Tag</td>
+                            <td class="text-end font-monospace text-info">clouddeploy:{{ info.version }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-secondary py-2">WSGI Server</td>
+                            <td class="text-end text-light">Gunicorn 22.0 (3 Workers, 2 Threads)</td>
+                        </tr>
+                        <tr>
+                            <td class="text-secondary py-2">Reverse Proxy Link</td>
+                            <td class="text-end text-light">Nginx Reverse Proxy &bull; Port 80 &rarr; 8000</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card border-secondary h-100">
+            <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
+                    <i class="bi bi-cloud-check-fill text-warning"></i> Section C: AWS Cloud Infrastructure
+                </h5>
+                <span class="badge {% if info.aws_cloud.connected %}bg-success{% else %}bg-secondary{% endif %}">
+                    {{ info.aws_cloud.status }}
+                </span>
+            </div>
+            <div class="card-body">
+                <table class="table table-dark table-sm mb-3">
+                    <tbody>
+                        <tr>
+                            <td class="text-secondary py-2">EC2 Instance ID</td>
+                            <td class="text-end font-monospace text-light">{{ info.aws_cloud.instance_id }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-secondary py-2">AWS Region</td>
+                            <td class="text-end text-light">{{ info.aws_region }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-secondary py-2">CloudWatch Agent</td>
+                            <td class="text-end text-light">{{ info.aws_cloud.cloudwatch_agent }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-secondary py-2">CPU Cores Allocated</td>
+                            <td class="text-end text-light">{{ info.system_metrics.cpu_count }} vCPU</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div>
+                    <div class="d-flex justify-content-between small text-secondary mb-1">
+                        <span>Host Storage Utilization: {{ info.system_metrics.disk_used_gb }} GB / {{ info.system_metrics.disk_total_gb }} GB</span>
+                        <span>{{ info.system_metrics.disk_used_pct }}%</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar {% if info.system_metrics.disk_used_pct > 80 %}bg-danger{% elif info.system_metrics.disk_used_pct > 60 %}bg-warning{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ info.system_metrics.disk_used_pct }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section D: CI/CD Pipeline Status -->
+    <div class="col-12">
+        <div class="card border-secondary">
+            <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
+                    <i class="bi bi-arrow-repeat text-primary"></i> Section D: CI/CD Automation Pipeline
+                </h5>
+                <a href="{{ info.cicd.html_url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-box-arrow-up-right me-1"></i> Repository Actions
+                </a>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-3 align-items-center text-center">
+                    <div class="col-md-3">
+                        <div class="p-3 rounded bg-surface border border-secondary">
+                            <i class="bi bi-github fs-3 text-white mb-2 d-block"></i>
+                            <div class="fw-semibold text-white">Repository</div>
+                            <small class="text-secondary font-monospace">{{ info.github_repo }}</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 rounded bg-surface border border-secondary">
+                            <i class="bi bi-shield-check fs-3 text-info mb-2 d-block"></i>
+                            <div class="fw-semibold text-white">CI Pipeline Status</div>
+                            <span class="badge {% if info.cicd.conclusion == 'success' %}bg-success{% elif info.cicd.conclusion == 'pending_publication' %}bg-secondary{% else %}bg-warning{% endif %}">
+                                {{ info.cicd.conclusion }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 rounded bg-surface border border-secondary">
+                            <i class="bi bi-tag fs-3 text-primary mb-2 d-block"></i>
+                            <div class="fw-semibold text-white">Commit SHA</div>
+                            <small class="text-secondary font-monospace">{{ info.cicd.commit_sha }}</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 rounded bg-surface border border-secondary">
+                            <i class="bi bi-clock-history fs-3 text-warning mb-2 d-block"></i>
+                            <div class="fw-semibold text-white">Pipeline Execution</div>
+                            <small class="text-secondary">{{ info.cicd.status }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section E: Deployment History -->
+    <div class="col-lg-6">
         <div class="card border-secondary h-100">
             <div class="card-header bg-surface border-bottom border-secondary py-3">
                 <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
-                    <i class="bi bi-info-circle text-primary"></i> Current Deployment Parameters
+                    <i class="bi bi-journal-text text-success"></i> Section E: Deployment History
                 </h5>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-dark table-hover mb-0 align-middle">
+                    <table class="table table-dark table-hover mb-0 small">
+                        <thead>
+                            <tr class="text-secondary border-bottom border-secondary">
+                                <th class="ps-3">Deployment ID</th>
+                                <th>Version</th>
+                                <th>Timestamp</th>
+                                <th>Environment</th>
+                                <th class="text-end pe-3">Result</th>
+                            </tr>
+                        </thead>
                         <tbody>
+                            {% for record in info.history %}
                             <tr>
-                                <th class="text-secondary ps-4 py-3" style="width: 35%;">Application Name</th>
-                                <td class="fw-bold text-white">{{ info.app_name }}</td>
-                            </tr>
-                            <tr>
-                                <th class="text-secondary ps-4 py-3">Release Version</th>
-                                <td>
-                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
-                                        v{{ info.version }}
+                                <td class="ps-3 font-monospace text-info">{{ record.deployment_id }}</td>
+                                <td>v{{ record.version }}</td>
+                                <td class="text-secondary">{{ record.timestamp }}</td>
+                                <td class="text-uppercase">{{ record.environment }}</td>
+                                <td class="text-end pe-3">
+                                    <span class="badge {% if record.status == 'SUCCESS' %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ record.status }}
                                     </span>
                                 </td>
                             </tr>
-                            <tr>
-                                <th class="text-secondary ps-4 py-3">Deployment Identifier</th>
-                                <td><code>{{ info.deployment_id if info.deployment_id else 'Unavailable' }}</code></td>
-                            </tr>
-                            <tr>
-                                <th class="text-secondary ps-4 py-3">Deployment Environment</th>
-                                <td>
-                                    <span class="badge bg-info-subtle text-info border border-info-subtle text-uppercase">
-                                        {{ info.environment }}
-                                    </span>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th class="text-secondary ps-4 py-3">Containerized State</th>
-                                <td>
-                                    {% if info.is_container %}
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle">
-                                        <i class="bi bi-check-circle-fill me-1"></i> Running inside Docker Container
-                                    </span>
-                                    {% else %}
-                                    <span class="badge bg-secondary-subtle text-light border border-secondary">
-                                        <i class="bi bi-laptop me-1"></i> Running directly on Host System
-                                    </span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            <tr>
-                                <th class="text-secondary ps-4 py-3">Service Start Time</th>
-                                <td class="text-light">{{ info.start_time }}</td>
-                            </tr>
-                            <tr>
-                                <th class="text-secondary ps-4 py-3">App Uptime</th>
-                                <td id="uptimeCounter" class="text-light">{{ info.uptime_seconds }} seconds</td>
-                            </tr>
-                            <tr>
-                                <th class="text-secondary ps-4 py-3">AWS Region Target</th>
-                                <td>
-                                    <span class="badge bg-secondary-subtle text-warning border border-secondary">
-                                        {{ info.aws_region }}
-                                    </span>
-                                </td>
-                            </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -92,39 +288,47 @@
         </div>
     </div>
 
-    <!-- Live Health & Endpoint Verification -->
-    <div class="col-lg-5">
+    <!-- Section F: Real-time Application Logs -->
+    <div class="col-lg-6">
         <div class="card border-secondary h-100">
             <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
-                    <i class="bi bi-heart-pulse text-danger"></i> Live Health Check Response
+                    <i class="bi bi-terminal text-info"></i> Section F: Recent Application Logs
                 </h5>
-                <span id="healthResponseCode" class="badge bg-secondary">HTTP 200</span>
+                <span class="badge bg-secondary small" id="logCountBadge">Streaming</span>
             </div>
-            <div class="card-body">
-                <p class="text-secondary small mb-3">
-                    Probing <code>GET /health</code> endpoint locally or via Nginx reverse proxy.
-                </p>
-                <pre class="bg-black text-success p-3 rounded border border-secondary mb-3 small" style="min-height: 140px;" id="healthJsonOutput">
-Loading health probe payload...
+            <div class="card-body p-0">
+                <pre class="bg-black text-light p-3 mb-0 small overflow-auto font-monospace" style="max-height: 260px; min-height: 200px;" id="applicationLogStream">
+Loading recent application log stream...
                 </pre>
-                <div class="d-flex justify-content-between align-items-center text-secondary small">
-                    <span>Latency: <strong id="healthLatency" class="text-white">-</strong></span>
-                    <span>Last Checked: <strong id="healthLastChecked" class="text-white">-</strong></span>
-                </div>
             </div>
         </div>
     </div>
 
-    <!-- Security & Architecture Isolation Notice -->
+    <!-- Live Health Probe Output -->
     <div class="col-12">
-        <div class="alert alert-dark border-secondary d-flex align-items-start gap-3 mb-0" role="alert">
-            <i class="bi bi-shield-check text-success fs-4 mt-1"></i>
-            <div>
-                <h6 class="alert-heading fw-bold mb-1">Security Isolation Policy Active</h6>
-                <p class="mb-0 small text-secondary">
-                    In compliance with production cloud security guidelines, all AWS credentials, session tokens, internal VPC subnets, and host identities are isolated. GitHub Actions uses OIDC short-lived credentials, and the EC2 runtime uses IAM instance profiles without long-lived access keys.
-                </p>
+        <div class="card border-secondary">
+            <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
+                    <i class="bi bi-heart-pulse text-danger"></i> Live Probe Output (/health & /api/info)
+                </h5>
+                <span id="healthResponseCode" class="badge bg-secondary">HTTP 200</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <small class="text-secondary fw-semibold">Endpoint: <code>GET /health</code></small>
+                        <pre class="bg-black text-success p-3 rounded border border-secondary mt-1 small" id="healthJsonOutput">Probing health...</pre>
+                    </div>
+                    <div class="col-md-6">
+                        <small class="text-secondary fw-semibold">Endpoint: <code>GET /api/info</code></small>
+                        <pre class="bg-black text-info p-3 rounded border border-secondary mt-1 small" id="infoJsonOutput">Probing metadata...</pre>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center text-secondary small mt-2">
+                    <span>Latency: <strong id="healthLatency" class="text-white">-</strong></span>
+                    <span>Last Checked: <strong id="healthLastChecked" class="text-white">-</strong></span>
+                </div>
             </div>
         </div>
     </div>

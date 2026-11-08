@@ -11,6 +11,7 @@ AWS_REGION="${3:-us-east-1}"
 APP_PORT="8000"
 APP_DIR="/opt/clouddeploy"
 LOG_FILE="/var/log/clouddeploy-deploy.log"
+HISTORY_FILE="$APP_DIR/deployment_history.json"
 
 exec > >(tee -a "$LOG_FILE") 2>&1
 
@@ -85,6 +86,30 @@ done
 if [ "$HEALTHY" -eq 1 ]; then
     echo "[$(date -u +'%Y-%m-%d %H:%M:%SZ')] Deployment SUCCESSFUL! Health check returned HTTP 200."
     echo "$IMAGE_TAG" > "$APP_DIR/current_tag.txt"
+
+    # Record successful deployment in history JSON
+    TIMESTAMP=$(date -u +'%Y-%m-%d %H:%M:%S UTC')
+    python3 -c "
+import json, sys
+entry = {
+    'deployment_id': sys.argv[1],
+    'version': sys.argv[1],
+    'timestamp': sys.argv[2],
+    'environment': 'production',
+    'status': 'SUCCESS',
+    'details': 'Automated rollout verified'
+}
+history = []
+try:
+    with open('$HISTORY_FILE', 'r') as f:
+        history = json.load(f)
+except Exception:
+    pass
+history.insert(0, entry)
+with open('$HISTORY_FILE', 'w') as f:
+    json.dump(history[:10], f, indent=2)
+" "$IMAGE_TAG" "$TIMESTAMP" 2>/dev/null || true
+
     # Clean up obsolete image layers
     docker image prune -f || true
     exit 0

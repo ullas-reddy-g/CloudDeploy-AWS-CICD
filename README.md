@@ -173,7 +173,7 @@ CloudDeploy/
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/<YOUR_USER>/CloudDeploy-AWS-CICD.git
+   git clone https://github.com/ullas-reddy-g/CloudDeploy-AWS-CICD.git
    cd CloudDeploy-AWS-CICD
    ```
 
@@ -229,34 +229,45 @@ python -m flake8 app/ tests/ --max-line-length=120
 
 ### Verified Test Results:
 ```text
-tests/test_app.py::test_homepage_status_and_content PASSED               [  6%]
-tests/test_app.py::test_deployment_page PASSED                           [ 12%]
-tests/test_app.py::test_about_page PASSED                                [ 18%]
-tests/test_app.py::test_404_not_found_html PASSED                        [ 25%]
-tests/test_app.py::test_404_not_found_json PASSED                        [ 31%]
-tests/test_app.py::test_500_error_handling_json PASSED                   [ 37%]
-tests/test_app.py::test_500_error_handling_html PASSED                   [ 43%]
-tests/test_app.py::test_error_trigger_forbidden_when_not_debug PASSED    [ 50%]
-tests/test_app.py::test_security_headers_present PASSED                  [ 56%]
-tests/test_app.py::test_get_uptime_seconds_helper PASSED                 [ 62%]
-tests/test_app.py::test_is_running_in_docker_helper PASSED               [ 68%]
-tests/test_app.py::test_create_app_env_overrides PASSED                  [ 75%]
-tests/test_app.py::test_create_app_default_config PASSED                 [ 81%]
-tests/test_health.py::test_health_endpoint_status PASSED                 [ 87%]
-tests/test_health.py::test_health_endpoint_payload PASSED                [ 93%]
+tests/test_app.py::test_homepage_status_and_content PASSED               [  3%]
+tests/test_app.py::test_deployment_page PASSED                           [  7%]
+tests/test_app.py::test_about_page PASSED                                [ 11%]
+tests/test_app.py::test_404_not_found_html PASSED                        [ 14%]
+tests/test_app.py::test_404_not_found_json PASSED                        [ 18%]
+tests/test_app.py::test_500_error_handling_json PASSED                   [ 22%]
+tests/test_app.py::test_500_error_handling_html PASSED                   [ 25%]
+tests/test_app.py::test_error_trigger_forbidden_when_not_debug PASSED    [ 29%]
+tests/test_app.py::test_security_headers_present PASSED                  [ 33%]
+tests/test_app.py::test_api_system_metrics PASSED                        [ 37%]
+tests/test_app.py::test_api_logs PASSED                                  [ 40%]
+tests/test_app.py::test_get_uptime_seconds_helper PASSED                 [ 44%]
+tests/test_app.py::test_is_running_in_docker_helper PASSED               [ 48%]
+tests/test_app.py::test_get_system_metrics_fallback PASSED               [ 51%]
+tests/test_app.py::test_get_aws_cloud_status_connected PASSED            [ 55%]
+tests/test_app.py::test_get_aws_cloud_status_unconnected PASSED          [ 59%]
+tests/test_app.py::test_get_cicd_pipeline_status_connected PASSED        [ 62%]
+tests/test_app.py::test_get_cicd_pipeline_status_fallback PASSED         [ 66%]
+tests/test_app.py::test_get_deployment_history_file PASSED               [ 70%]
+tests/test_app.py::test_get_deployment_history_corrupted_fallback PASSED [ 74%]
+tests/test_app.py::test_disk_alert_rendered_in_dashboard PASSED          [ 77%]
+tests/test_app.py::test_recent_logs_handler_error_handling PASSED        [ 81%]
+tests/test_app.py::test_create_app_env_overrides PASSED                  [ 85%]
+tests/test_app.py::test_create_app_default_config PASSED                 [ 88%]
+tests/test_health.py::test_health_endpoint_status PASSED                 [ 92%]
+tests/test_health.py::test_health_endpoint_payload PASSED                [ 96%]
 tests/test_health.py::test_api_info_endpoint PASSED                      [100%]
 
 ---------- coverage: platform win32, python 3.11.5 -----------
 Name              Stmts   Miss  Cover
 -------------------------------------
-app\__init__.py      50      0   100%
-app\config.py        25      0   100%
-app\routes.py        48      0   100%
+app\__init__.py      67      0   100%
+app\config.py        26      0   100%
+app\routes.py       120      0   100%
 -------------------------------------
-TOTAL               123      0   100%
+TOTAL               213      0   100%
 
-============================= 16 passed in 0.95s ==============================
-Coverage: 100%
+============================= 27 passed in 1.72s ==============================
+Coverage: 100% (213 / 213 statements)
 Flake8 Violations: 0
 ```
 

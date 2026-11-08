@@ -1,25 +1,51 @@
 import logging
 import os
 import sys
+from collections import deque
 from datetime import datetime, timezone
 from flask import Flask, render_template, jsonify, request
 from app.config import config_by_name
 
 
+class RecentLogsHandler(logging.Handler):
+    """Ring-buffer logging handler retaining recent application logs for monitoring."""
+    def __init__(self, capacity=50):
+        super().__init__()
+        self.buffer = deque(maxlen=capacity)
+
+    def emit(self, record):
+        try:
+            self.buffer.append({
+                "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S UTC"),
+                "level": record.levelname,
+                "message": record.getMessage(),
+            })
+        except Exception:
+            self.handleError(record)
+
+
 def setup_logging(app):
-    """Configure structured logging for standard output (compatible with Docker & CloudWatch)."""
+    """Configure structured logging for stdout (CloudWatch compatible) and in-memory buffer."""
     log_level = logging.DEBUG if app.config.get("DEBUG") else logging.INFO
     formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)s] [CloudDeploy] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S %z"
     )
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(formatter)
-    handler.setLevel(log_level)
+
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    stdout_handler.setFormatter(formatter)
+    stdout_handler.setLevel(log_level)
+
+    recent_logs_handler = RecentLogsHandler(capacity=50)
+    recent_logs_handler.setFormatter(formatter)
+    recent_logs_handler.setLevel(log_level)
 
     app.logger.handlers.clear()
-    app.logger.addHandler(handler)
+    app.logger.addHandler(stdout_handler)
+    app.logger.addHandler(recent_logs_handler)
     app.logger.setLevel(log_level)
+
+    app.log_buffer = recent_logs_handler
 
 
 def create_app(config_name=None):
@@ -38,6 +64,8 @@ def create_app(config_name=None):
         app.config["DEPLOYMENT_ID"] = os.getenv("DEPLOYMENT_ID")
     if os.getenv("AWS_REGION"):
         app.config["AWS_REGION"] = os.getenv("AWS_REGION")
+    if os.getenv("GITHUB_REPOSITORY"):
+        app.config["GITHUB_REPOSITORY"] = os.getenv("GITHUB_REPOSITORY")
 
     setup_logging(app)
 

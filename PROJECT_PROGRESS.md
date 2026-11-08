@@ -57,8 +57,8 @@ Amazon CloudWatch (Metrics & Centralized JSON Log Ingestion)
 - [x] Implement route, UI, navigation, and error handler tests in `tests/test_app.py`.
 - [x] Implement health and non-sensitive API tests in `tests/test_health.py`.
 - [x] Execute `pytest -v` and verify 100% test pass rate locally:
-  - **16/16 tests passed** in `0.92s`
-  - **100% statement coverage** across all application modules (`app/__init__.py`, `app/config.py`, `app/routes.py`)
+  - **27/27 tests passed** in `1.72s`
+  - **100% statement coverage** across all application modules (`app/__init__.py`, `app/config.py`, `app/routes.py` — 213/213 statements)
   - **0 Flake8 lint violations**
 
 ### Phase 4: Containerization & Reverse Proxy
@@ -99,7 +99,7 @@ Amazon CloudWatch (Metrics & Centralized JSON Log Ingestion)
 |---|---|---|
 | **Flask Application** | **LOCALLY VERIFIED** | Factory pattern, routes, error handlers, and structured logging. Tested via pytest and local test client. |
 | **Frontend UI** | **LOCALLY VERIFIED** | Bootstrap 5.3 UI templates, CSS styling, AJAX health polling, KPI cards, and diagnostics panel. |
-| **Automated Tests** | **LOCALLY VERIFIED** | 16/16 tests passing in 0.92s, **100% statement coverage**, 0 flake8 errors. |
+| **Automated Tests** | **LOCALLY VERIFIED** | 27/27 tests passing in 1.72s, **100% statement coverage (213/213 statements)**, 0 flake8 errors. |
 | **Docker Build** | **IMPLEMENTED** | Multi-stage Dockerfile with UID 10001, Python 3.11-slim, Gunicorn WSGI. Automated verification configured in `ci.yml`. |
 | **Docker Compose** | **IMPLEMENTED** | `docker-compose.yml` orchestrates web app + Nginx proxy with service health dependencies. Automated verification configured in `ci.yml`. |
 | **Local Git Repository** | **LOCALLY VERIFIED** | Git repository initialized on `main` branch with clean history and `.gitignore` preventing secret leakage. |

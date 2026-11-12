@@ -38,8 +38,10 @@ jobs:
           flake8 app/ tests/ --count --max-line-length=120 --statistics
 
       - name: Execute Automated Test Suite (Pytest)
+        env:
+          PYTHONPATH: .
         run: |
-          pytest -v --cov=app --cov-report=term-missing --cov-fail-under=80
+          python -m pytest -v --cov=app --cov-report=term-missing --cov-fail-under=80
 
   docker-verify:
     name: Container Build & Runtime Verification

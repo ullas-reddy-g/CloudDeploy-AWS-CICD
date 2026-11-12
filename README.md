@@ -1,7 +1,7 @@
 # CloudDeploy: Automated Cloud Deployment of a Containerized Web Application Using AWS and CI/CD
 
 [![CI Pipeline](https://img.shields.io/badge/CI%20Pipeline-Passing-2ea043?style=for-the-badge&logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
-[![CD Pipeline](https://img.shields.io/badge/CD%20Pipeline-AWS%20OIDC-2f81f7?style=for-the-badge&logo=amazonwebservices&logoColor=white)](.github/workflows/deploy.yml)
+[![CD Pipeline](https://img.shields.io/badge/CD%20Pipeline-AWS%20OIDC-2f81f7?style=for-the-badge&logo=amazonwebservices&logoColor=white)](.github/workflows/cd.yml)
 [![Python Version](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python&logoColor=white)](requirements.txt)
 [![Docker](https://img.shields.io/badge/Docker-Containerized-2496ed?style=for-the-badge&logo=docker&logoColor=white)](Dockerfile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
@@ -135,7 +135,7 @@ CloudDeploy/
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml                       # CI: Linting, Pytest & Docker Build
-│       └── deploy.yml                   # CD: AWS OIDC, ECR, SSM & Health Check
+│       └── cd.yml                       # CD: AWS OIDC, ECR, SSM & Health Check
 │
 ├── deployment/
 │   ├── aws/
@@ -277,12 +277,12 @@ Flake8 Violations: 0
 |---|---|---|
 | **Flask Web App** | **LOCALLY VERIFIED** | Tested via Pytest test client across all routes and error scenarios. |
 | **Frontend UI** | **LOCALLY VERIFIED** | Tested templates, CSS styling, AJAX health polling, and diagnostics. |
-| **Automated Tests** | **LOCALLY VERIFIED** | 16/16 tests passing, 100% coverage, 0 Flake8 violations. |
+| **Automated Tests** | **LOCALLY VERIFIED** | 27/27 tests passing, 100% statement coverage (213/213 statements), 0 Flake8 violations. |
 | **Docker Build** | **IMPLEMENTED** | Multi-stage Dockerfile verified; automated build & runtime test in CI workflow. |
 | **Docker Compose** | **IMPLEMENTED** | Multi-container compose verified; automated proxy test in CI workflow. |
 | **Git Repository** | **LOCALLY VERIFIED** | Local repository on `main` branch with clean history and secret exclusion. |
 | **CI Workflow** | **IMPLEMENTED** | `.github/workflows/ci.yml` validates lint, tests, coverage, container & Compose. |
-| **CD Workflow** | **IMPLEMENTED** | `.github/workflows/deploy.yml` with OIDC auth, ECR push, SSM rollout & rollback. |
+| **CD Workflow** | **IMPLEMENTED** | `.github/workflows/cd.yml` with OIDC auth, ECR push, SSM rollout & rollback. |
 | **Amazon ECR** | **IMPLEMENTED** | Automated creation script with AES-256 encryption & 10-image lifecycle policy. |
 | **AWS EC2 Bootstrap** | **IMPLEMENTED** | Self-contained user-data script with embedded rollout and rollback scripts. |
 | **CloudWatch Observability** | **IMPLEMENTED** | Metrics and JSON log stream collection configurations prepared. |

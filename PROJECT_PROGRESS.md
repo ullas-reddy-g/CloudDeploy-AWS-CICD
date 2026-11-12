@@ -69,7 +69,7 @@ Amazon CloudWatch (Metrics & Centralized JSON Log Ingestion)
 
 ### Phase 5: CI/CD Workflows (GitHub Actions)
 - [x] Create `.github/workflows/ci.yml` for automated linting, tests with coverage enforcement (>=80%), Docker image build, container health check test, and Docker Compose validation.
-- [x] Create `.github/workflows/deploy.yml` with AWS OIDC authentication, ECR push, EC2 deployment via AWS SSM, healthcheck verification, and rollback logic.
+- [x] Create `.github/workflows/cd.yml` with AWS OIDC authentication, ECR push, EC2 deployment via AWS SSM, healthcheck verification, and rollback logic.
 
 ### Phase 6: AWS Infrastructure, Security & Deployment Scripts
 - [x] Create IAM policies: `deployment/aws/iam-policy.json`, EC2 instance profile, and GitHub OIDC trust policy (`github-oidc-trust-policy.json`).
@@ -104,7 +104,7 @@ Amazon CloudWatch (Metrics & Centralized JSON Log Ingestion)
 | **Docker Compose** | **IMPLEMENTED** | `docker-compose.yml` orchestrates web app + Nginx proxy with service health dependencies. Automated verification configured in `ci.yml`. |
 | **Local Git Repository** | **LOCALLY VERIFIED** | Git repository initialized on `main` branch with clean history and `.gitignore` preventing secret leakage. |
 | **GitHub Actions CI** | **IMPLEMENTED** | `.github/workflows/ci.yml` validates flake8, pytest (>=80% cov), container build, and Compose proxy test. |
-| **GitHub Actions CD** | **IMPLEMENTED** | `.github/workflows/deploy.yml` with OIDC auth, ECR push, SSM dispatch, health validation, and rollback. |
+| **GitHub Actions CD** | **IMPLEMENTED** | `.github/workflows/cd.yml` with OIDC auth, ECR push, SSM dispatch, health validation, and rollback. |
 | **Amazon ECR** | **IMPLEMENTED** | Automated provisioning script (`ecr-setup.sh`) with AES-256 encryption, scan-on-push, and 10-image lifecycle policy. |
 | **AWS EC2 Bootstrap** | **IMPLEMENTED** | Self-contained user-data script (`ec2-user-data.sh`) installing Docker, Nginx, SSM, and CloudWatch agent with embedded deployment scripts. |
 | **OIDC Authentication** | **IMPLEMENTED** | IAM trust policy (`github-oidc-trust-policy.json`) and least-privilege IAM policy without long-lived access keys. |
@@ -119,7 +119,7 @@ Amazon CloudWatch (Metrics & Centralized JSON Log Ingestion)
    - Python 3.11.5: Installed & Operational
    - Pip 25.0.1: Installed & Operational
    - Git 2.56.0: Installed & Operational
-   - Pytest 9.1.1: Installed & Operational (16/16 Passed, 100% Coverage)
+   - Pytest 8.2.2: Installed & Operational (27/27 Passed, 100% Statement Coverage)
    - Flake8 7.1.0: Installed & Operational (0 Violations)
    - Docker Desktop: Not Installed on Local Windows Workstation (Execution automated via GitHub Actions runner)
    - AWS CLI: Not Installed on Local Windows Workstation

@@ -58,7 +58,7 @@ flowchart TD
     DevCode --> GitRepo
     GitRepo --> GHPush
     GHPush --> GHA_CI
-    GHA_CI -->|Passes All 37 Tests & Docker Check| GHA_CD
+    GHA_CI -->|Passes All 40 Tests & Docker Check| GHA_CD
     GHA_CD --> RenderService
     RenderService --> GunicornWSGI
     GunicornWSGI --> LiveEndpoint
@@ -76,7 +76,7 @@ flowchart TD
 |---|---|---|
 | **Web Framework** | Python 3.11 / Flask 3.0.3 | Application factory pattern, structured JSON REST API, telemetry endpoints, and Jinja2 templating. |
 | **WSGI Server** | Gunicorn 22.0.0 | Production-grade WSGI server running multiple worker processes with asynchronous worker timeouts and stdout logging. |
-| **Testing Suite** | Pytest 8.2.2 + pytest-cov 5.0.0 | Automated unit, route, API, and error-handling test cases achieving **100% statement coverage (359/359 statements)**. |
+| **Testing Suite** | Pytest 8.2.2 + pytest-cov 5.0.0 | Automated unit, route, API, container, and error-handling test cases achieving **100% statement coverage (461/461 statements)**. |
 | **Code Style** | Flake8 7.1.0 | PEP8 formatting and syntax validation enforced with zero allowed violations. |
 | **Containerization** | Docker Engine & Dockerfile | Multi-stage, secure container image built on `python:3.11-slim` running as non-root user `clouddeploy` (UID 10001). |
 | **Orchestration** | Docker Compose v2 | Multi-container composition linking `clouddeploy-web` and `clouddeploy-nginx` with service health dependencies. |

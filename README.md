@@ -36,10 +36,10 @@ CloudDeploy solves these challenges through an end-to-end automated pipeline wit
 ## 3. Key Objectives
 
 1. **Production-Ready Application:** Modular Flask web application with responsive Bootstrap 5 UI, health check probes (`/health`), non-sensitive metadata (`/api/info`), and consolidated telemetry (`/deployment`).
-2. **Hardened Containerization:** Lightweight Docker image based on `python:3.11-slim`, executing strictly under an unprivileged user (`clouddeploy` UID 10001) with internal Python health probes.
-3. **Automated Continuous Integration (CI):** GitHub Actions workflow executing Flake8 style enforcement (0 violations), Pytest test suite with **100% statement coverage (359/359 statements)**, Docker build verification, non-root user verification, and Docker Compose reverse proxy validation.
-4. **Automated Continuous Deployment (CD):** Continuous delivery to Render Cloud via native Git-push integration and secured deploy hooks with post-rollout health check validation.
-5. **Real Upstream Telemetry:** Live dashboard querying the official GitHub Actions REST API for recent workflow runs, durations, and conclusions, alongside real-time sanitized log streaming.
+2. **Hardened Containerization:** Lightweight Docker image based on `python:3.11-slim`, executing strictly under an unprivileged user (`clouddeploy` UID 10001) with internal Python health probes and deterministic container markers (`DOCKER_CONTAINER=true`).
+3. **Automated Continuous Integration (CI):** GitHub Actions workflow executing Flake8 style enforcement (0 violations), Pytest test suite with **100% statement coverage (461/461 statements)**, Docker build verification, non-root user verification, and Docker Compose reverse proxy validation.
+4. **Automated Continuous Deployment (CD):** Continuous delivery to Render Cloud via native Git-push integration and secured deploy hooks with post-rollout health check validation and duplicate build prevention.
+5. **Real Upstream Telemetry:** Live dashboard querying the official GitHub Actions REST API for recent workflow runs, durations, and conclusions, cgroup v1/v2 container metrics with honest unavailable fallbacks, and real-time sanitized log streaming.
 6. **Enterprise Architecture Extension:** Complete AWS infrastructure automation code (IAM OIDC, Amazon ECR, EC2 user-data bootstrap, CloudWatch agent configuration) for enterprise cloud deployment demonstration.
 
 ---
@@ -55,7 +55,7 @@ CloudDeploy solves these challenges through an end-to-end automated pipeline wit
 | **CI Automation** | GitHub Actions (`ci.yml`) | Flake8 linting, Pytest 100% coverage, Docker Buildx, Compose runtime test |
 | **CD Automation** | GitHub Actions (`cd.yml`) & Render | Automated deployment triggers and health check verification |
 | **Production Hosting** | Render Cloud (Free Tier) | Public HTTPS web service at `https://clouddeploy-aws-cicd.onrender.com` |
-| **Automated Testing** | Pytest 8.2.2, pytest-cov 5.0.0, Flake8 7.1.0 | 37 automated tests, 100% statement coverage, 0 Flake8 errors |
+| **Automated Testing** | Pytest 8.2.2, pytest-cov 5.0.0, Flake8 7.1.0 | 40 automated tests, 100% statement coverage (461/461 statements), 0 Flake8 errors |
 | **Enterprise Extension** | AWS (ECR, EC2, IAM OIDC, SSM, CloudWatch) | Optional enterprise cloud infrastructure artifacts in `deployment/aws/` |
 
 ---

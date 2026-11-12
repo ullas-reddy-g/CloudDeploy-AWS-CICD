@@ -15,11 +15,12 @@ class Config:
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
     HOSTING_PROVIDER = os.getenv(
         "HOSTING_PROVIDER",
-        "render" if (os.getenv("RENDER") or os.getenv("RENDER_SERVICE_ID")) else "local"
+        "render" if (os.getenv("RENDER") or os.getenv("RENDER_SERVICE_ID") or os.getenv("IS_PULL_REQUEST")) else "local"
     )
-    RENDER_SERVICE_ID = os.getenv("RENDER_SERVICE_ID", "")
+    RENDER_SERVICE_ID = os.getenv("RENDER_SERVICE_ID", "srv-dbqn4es9v7es73d40jag")
     RENDER_API_KEY = os.getenv("RENDER_API_KEY", "")
     RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://clouddeploy-aws-cicd.onrender.com")
+    DOCKER_CONTAINER = os.getenv("DOCKER_CONTAINER", "").lower() in ("true", "1", "yes")
     START_TIME = datetime.now(timezone.utc)
     TESTING = False
     DEBUG = False

@@ -11,11 +11,17 @@ from flask import Blueprint, render_template, jsonify, current_app, request
 
 main_bp = Blueprint("main", __name__)
 
-# In-memory cache for GitHub API responses to prevent rate limiting
+# In-memory caches to prevent rate limiting
 _github_cache = {
     "data": None,
     "timestamp": 0.0,
-    "ttl": 30.0,
+    "ttl": 60.0,
+}
+
+_render_cache = {
+    "data": None,
+    "timestamp": 0.0,
+    "ttl": 60.0,
 }
 
 
@@ -29,23 +35,163 @@ def get_uptime_seconds(app):
 
 
 def is_running_in_docker():
-    """Detect safely whether the application is running inside a Docker container."""
+    """
+    Detect reliably whether the application is running inside a Docker/container runtime.
+    Checks explicit environment markers, filesystem signatures, Linux cgroups, and mountinfo.
+    """
+    # 1. Explicit container environment markers
+    if os.getenv("DOCKER_CONTAINER", "").lower() in ("true", "1", "yes"):
+        return True
+    if os.getenv("CONTAINER", "").lower() in ("docker", "podman", "containerd", "true"):
+        return True
+
+    # 2. Filesystem marker files
     try:
-        if os.path.exists("/.dockerenv"):
+        if os.path.exists("/etc/clouddeploy-container") or os.path.exists("/.dockerenv"):
             return True
-        cgroup_path = "/proc/self/cgroup"
-        if os.path.exists(cgroup_path):
-            with open(cgroup_path, "r", encoding="utf-8") as f:
-                content = f.read()
-                if "docker" in content or "kubepods" in content or "containerd" in content:
+    except Exception:
+        pass
+
+    # 3. Linux cgroup inspection (cgroup v1 keywords and container signatures)
+    try:
+        for cgroup_path in ("/proc/self/cgroup", "/proc/1/cgroup"):
+            if os.path.exists(cgroup_path):
+                with open(cgroup_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if any(kw in content for kw in ("docker", "kubepods", "containerd", "libpod")):
+                        return True
+    except Exception:
+        pass
+
+    # 4. Linux mountinfo inspection (container overlay filesystem)
+    try:
+        if os.path.exists("/proc/self/mountinfo"):
+            with open("/proc/self/mountinfo", "r", encoding="utf-8") as f:
+                mounts = f.read()
+                if any(kw in mounts for kw in ("docker", "containerd")) or ("overlay" in mounts and " / " in mounts):
                     return True
     except Exception:
         pass
+
     return False
 
 
+def get_runtime_privilege():
+    """
+    Determine the actual process execution user and privilege.
+    Returns UID and a verified, honest privilege description.
+    """
+    if hasattr(os, "getuid"):
+        try:
+            uid = os.getuid()
+            if uid == 10001:
+                return {
+                    "is_non_root": True,
+                    "uid": 10001,
+                    "label": "Non-Root User (UID 10001 / clouddeploy)"
+                }
+            elif uid == 0:
+                return {
+                    "is_non_root": False,
+                    "uid": 0,
+                    "label": "Root User (UID 0 - Unprivileged execution disabled)"
+                }
+            else:
+                return {
+                    "is_non_root": (uid != 0),
+                    "uid": uid,
+                    "label": f"Non-Root User (UID {uid})"
+                }
+        except Exception:
+            pass
+
+    user = os.getenv("USERNAME") or os.getenv("USER") or "Workstation User"
+    return {
+        "is_non_root": True,
+        "uid": None,
+        "label": f"Host Workstation User ({user})"
+    }
+
+
+def get_container_resource_limits():
+    """
+    Inspect Linux cgroups (v1 and v2) to determine genuine container memory and CPU limits.
+    Returns container limits or None if unconstrained or unexposed.
+    """
+    mem_limit_mb = None
+    mem_usage_mb = None
+    cpu_limit_cores = None
+    cgroup_version = None
+
+    # Check cgroup v2
+    try:
+        if os.path.exists("/sys/fs/cgroup/memory.max"):
+            cgroup_version = "v2"
+            with open("/sys/fs/cgroup/memory.max", "r", encoding="utf-8") as f:
+                max_str = f.read().strip()
+                if max_str != "max":
+                    limit_bytes = int(max_str)
+                    if limit_bytes < (64 * 1024 ** 4):  # Filter out unconstrained (>64 TB)
+                        mem_limit_mb = round(limit_bytes / (1024 * 1024), 1)
+
+            if os.path.exists("/sys/fs/cgroup/memory.current"):
+                with open("/sys/fs/cgroup/memory.current", "r", encoding="utf-8") as f:
+                    usage_bytes = int(f.read().strip())
+                    mem_usage_mb = round(usage_bytes / (1024 * 1024), 1)
+
+            if os.path.exists("/sys/fs/cgroup/cpu.max"):
+                with open("/sys/fs/cgroup/cpu.max", "r", encoding="utf-8") as f:
+                    parts = f.read().strip().split()
+                    if len(parts) == 2 and parts[0] != "max":
+                        quota = int(parts[0])
+                        period = int(parts[1])
+                        if period > 0:
+                            cpu_limit_cores = round(quota / period, 2)
+    except Exception:
+        pass
+
+    # Check cgroup v1 if v2 was not found or limit was unconstrained
+    if mem_limit_mb is None:
+        try:
+            v1_mem_limit = "/sys/fs/cgroup/memory/memory.limit_in_bytes"
+            v1_mem_usage = "/sys/fs/cgroup/memory/memory.usage_in_bytes"
+            if os.path.exists(v1_mem_limit):
+                cgroup_version = "v1"
+                with open(v1_mem_limit, "r", encoding="utf-8") as f:
+                    limit_bytes = int(f.read().strip())
+                    if limit_bytes < (1024 ** 4):  # < 1 TB (exclude unconstrained 9223372036854771712)
+                        mem_limit_mb = round(limit_bytes / (1024 * 1024), 1)
+
+            if os.path.exists(v1_mem_usage):
+                with open(v1_mem_usage, "r", encoding="utf-8") as f:
+                    usage_bytes = int(f.read().strip())
+                    mem_usage_mb = round(usage_bytes / (1024 * 1024), 1)
+
+            v1_cpu_quota = "/sys/fs/cgroup/cpu/cpu.cfs_quota_us"
+            v1_cpu_period = "/sys/fs/cgroup/cpu/cpu.cfs_period_us"
+            if os.path.exists(v1_cpu_quota) and os.path.exists(v1_cpu_period):
+                with open(v1_cpu_quota, "r", encoding="utf-8") as f_q:
+                    quota = int(f_q.read().strip())
+                with open(v1_cpu_period, "r", encoding="utf-8") as f_p:
+                    period = int(f_p.read().strip())
+                if quota > 0 and period > 0:
+                    cpu_limit_cores = round(quota / period, 2)
+        except Exception:
+            pass
+
+    return {
+        "cgroup_version": cgroup_version or "unavailable",
+        "container_memory_limit_mb": mem_limit_mb,
+        "container_memory_usage_mb": mem_usage_mb,
+        "container_cpu_limit_cores": cpu_limit_cores,
+    }
+
+
 def get_system_metrics():
-    """Retrieve actual host/system storage, CPU, and memory hardware metrics."""
+    """
+    Retrieve actual system storage, CPU, and genuine container resource allocations.
+    Clearly distinguishes container allocation from host-node capacity.
+    """
     try:
         disk = shutil.disk_usage(os.getcwd())
         total_gb = round(disk.total / (1024 ** 3), 1)
@@ -57,9 +203,24 @@ def get_system_metrics():
 
     cpu_count = os.cpu_count() or 1
 
-    mem_total = "unavailable"
-    mem_available = "unavailable"
-    mem_used_pct = "unavailable"
+    # Retrieve container limits from Linux cgroups
+    cgroup_data = get_container_resource_limits()
+    mem_limit = cgroup_data["container_memory_limit_mb"]
+    mem_usage = cgroup_data["container_memory_usage_mb"]
+    cpu_limit = cgroup_data["container_cpu_limit_cores"]
+
+    container_mem_limit_str = (
+        f"{mem_limit} MB" if mem_limit is not None else "Metric unavailable in current hosting environment"
+    )
+    container_mem_usage_str = (
+        f"{mem_usage} MB" if mem_usage is not None else "Metric unavailable in current hosting environment"
+    )
+    container_cpu_str = (
+        f"{cpu_limit} vCPU" if cpu_limit is not None else "Shared Host Allocation (Quota unconstrained or unexposed)"
+    )
+
+    # Read physical host node RAM for transparency
+    host_ram_str = "unavailable"
     try:
         if os.path.exists("/proc/meminfo"):
             with open("/proc/meminfo", "r", encoding="utf-8") as f:
@@ -68,37 +229,46 @@ def get_system_metrics():
             for line in lines:
                 parts = line.split(":")
                 if len(parts) == 2:
-                    key = parts[0].strip()
-                    val = parts[1].strip().split()[0]
-                    mem_info[key] = int(val)
-            if "MemTotal" in mem_info and "MemAvailable" in mem_info:
-                t_mb = round(mem_info["MemTotal"] / 1024, 1)
-                a_mb = round(mem_info["MemAvailable"] / 1024, 1)
-                u_pct = round(
-                    ((mem_info["MemTotal"] - mem_info["MemAvailable"]) / mem_info["MemTotal"]) * 100, 1
-                )
-                mem_total = f"{t_mb} MB"
-                mem_available = f"{a_mb} MB"
-                mem_used_pct = f"{u_pct}%"
+                    mem_info[parts[0].strip()] = int(parts[1].strip().split()[0])
+            if "MemTotal" in mem_info:
+                host_ram_str = f"{round(mem_info['MemTotal'] / 1024, 1)} MB"
     except Exception:
         pass
 
     return {
+        # Backward-compatible fields
         "disk_total_gb": total_gb,
         "disk_used_gb": used_gb,
         "disk_free_gb": free_gb,
         "disk_used_pct": used_pct,
         "cpu_count": cpu_count,
-        "mem_total": mem_total,
-        "mem_available": mem_available,
-        "mem_used_pct": mem_used_pct,
+        "mem_total": container_mem_limit_str,
+        "mem_available": container_mem_usage_str,
+        "mem_used_pct": "N/A" if mem_limit is None else f"{round((mem_usage / mem_limit) * 100, 1)}%",
+        # Granular categorized metrics
+        "container": {
+            "memory_limit": container_mem_limit_str,
+            "memory_usage": container_mem_usage_str,
+            "cpu_allocation": container_cpu_str,
+            "cgroup_version": cgroup_data["cgroup_version"],
+        },
+        "host_node": {
+            "label": "Underlying Host Node Capacity (Shared Cluster Platform)",
+            "cpu_cores": f"{cpu_count} vCPU (Physical Host)",
+            "physical_ram": host_ram_str,
+            "disk_total_gb": total_gb,
+            "disk_used_gb": used_gb,
+            "disk_free_gb": free_gb,
+            "disk_used_pct": used_pct,
+            "disk_scope": "Host Root Filesystem (Shared Platform Volume; not service quota)",
+        }
     }
 
 
 def get_aws_cloud_status():
     """
     Attempt to fetch real EC2 metadata via IMDSv2 with a strict 0.5s timeout.
-    Returns honest status if running locally or unconfigured.
+    Returns honest status indicating it is an optional architecture extension.
     """
     try:
         token_req = urllib.request.Request(
@@ -124,8 +294,8 @@ def get_aws_cloud_status():
         }
     except Exception:
         return {
-            "status": "Awaiting AWS Connection",
-            "instance_id": "Unavailable (Not hosted on EC2)",
+            "status": "Optional Extension (Not Hosted on EC2)",
+            "instance_id": "Unavailable (Active on Render Cloud)",
             "connected": False,
             "cloudwatch_agent": "Not Configured (Requires AWS Host)",
         }
@@ -146,7 +316,7 @@ def parse_duration_seconds(created_at_str, updated_at_str):
 def fetch_github_workflows(repo_name, token=None, per_page=5, force_refresh=False):
     """
     Fetch recent workflow runs from GitHub Actions REST API with caching.
-    Handles unauthenticated public API rate limits cleanly.
+    Supports optional GITHUB_TOKEN and handles rate limits gracefully.
     """
     now = time.time()
     if (
@@ -206,7 +376,10 @@ def fetch_github_workflows(repo_name, token=None, per_page=5, force_refresh=Fals
     except urllib.error.HTTPError as err:
         rate_limit_remaining = err.headers.get("X-RateLimit-Remaining") if err.headers else "0"
         if err.code in (403, 429):
-            msg = "GitHub API rate limit exceeded. Displaying cached/fallback telemetry."
+            msg = (
+                "GitHub API rate limit exceeded on shared hosting IP. "
+                "Configure GITHUB_TOKEN in Render environment variables for 5,000 requests/hr."
+            )
             status = "rate_limited"
         elif err.code == 404:
             msg = f"GitHub repository '{repo_name}' not found."
@@ -283,34 +456,50 @@ def get_cicd_pipeline_status(repo_name):
     }
 
 
-def fetch_render_deployments(service_id, api_key, limit=5):
+def fetch_render_deployments(service_id, api_key, limit=5, force_refresh=False):
     """
-    Retrieve real deployment records from Render REST API if credentials are provided.
-    Falls back to honest integration status without fake records.
+    Retrieve genuine deployment records from Render REST API if credentials are provided.
+    Falls back cleanly to application runtime metadata with honest labeling.
     """
+    now = time.time()
+    if (
+        not force_refresh
+        and _render_cache["data"]
+        and (now - _render_cache["timestamp"] < _render_cache["ttl"])
+    ):
+        return _render_cache["data"]
+
     live_url = current_app.config.get(
         "RENDER_EXTERNAL_URL", "https://clouddeploy-aws-cicd.onrender.com"
     )
+
     if not service_id or not api_key:
-        return {
+        result = {
             "integration_status": "unconfigured",
-            "source": "native_git_deployment",
+            "source": "application_metadata",
+            "record_type": "Application Runtime Metadata",
             "provider": "Render (Cloud PaaS)",
             "live_url": live_url,
             "service_id": service_id or "Not configured",
             "message": (
-                "Render API credentials (RENDER_API_KEY, RENDER_SERVICE_ID) not configured in environment. "
-                "Native automatic Git-push deployment is operational."
+                "Render API key (RENDER_API_KEY) not configured in environment. "
+                "Displaying active runtime deployment metadata. "
+                "To query real-time deployment history from the Render REST API, "
+                "add RENDER_API_KEY to your Render environment variables."
             ),
             "deployments": [{
                 "deployment_id": current_app.config.get("DEPLOYMENT_ID", "local-build"),
                 "version": current_app.config.get("APP_VERSION", "1.0.0"),
                 "timestamp": current_app.config.get("START_TIME").strftime("%Y-%m-%d %H:%M:%S UTC"),
-                "status": "LIVE",
+                "status": "LIVE (Active Runtime)",
+                "record_type": "Application Runtime Metadata",
                 "trigger": "git_push",
                 "details": "Active application runtime on Render Cloud",
             }]
         }
+        _render_cache["data"] = result
+        _render_cache["timestamp"] = now
+        return result
 
     url = f"https://api.render.com/v1/services/{service_id}/deploys?limit={limit}"
     headers = {
@@ -328,31 +517,46 @@ def fetch_render_deployments(service_id, api_key, limit=5):
                 commit = deploy_info.get("commit", {})
                 deploys.append({
                     "id": deploy_info.get("id"),
-                    "status": deploy_info.get("status", "unknown"),
+                    "status": deploy_info.get("status", "unknown").upper(),
                     "commit_id": (commit.get("id") or "")[:8],
                     "commit_message": commit.get("message", ""),
+                    "record_type": "Official Render REST API",
                     "created_at": deploy_info.get("createdAt"),
                     "updated_at": deploy_info.get("updatedAt"),
                     "finished_at": deploy_info.get("finishedAt"),
                 })
-            return {
+            result = {
                 "integration_status": "connected",
-                "source": "render_api",
-                "provider": "Render",
+                "source": "official_render_api",
+                "record_type": "Official Render REST API",
+                "provider": "Render Cloud",
                 "live_url": live_url,
                 "service_id": service_id,
                 "deployments": deploys,
             }
+            _render_cache["data"] = result
+            _render_cache["timestamp"] = now
+            return result
     except Exception as err:
-        return {
+        result = {
             "integration_status": "error",
-            "source": "render_api",
-            "provider": "Render",
+            "source": "application_metadata_fallback",
+            "record_type": "Application Runtime Metadata",
+            "provider": "Render Cloud",
             "live_url": live_url,
             "service_id": service_id,
             "message": f"Render API communication error: {str(err)}",
-            "deployments": [],
+            "deployments": [{
+                "deployment_id": current_app.config.get("DEPLOYMENT_ID", "local-build"),
+                "version": current_app.config.get("APP_VERSION", "1.0.0"),
+                "timestamp": current_app.config.get("START_TIME").strftime("%Y-%m-%d %H:%M:%S UTC"),
+                "status": "LIVE (Fallback)",
+                "record_type": "Application Runtime Metadata",
+                "trigger": "git_push",
+                "details": "Active application runtime on Render Cloud",
+            }],
         }
+        return result
 
 
 def get_deployment_history():
@@ -378,7 +582,8 @@ def get_deployment_history():
         "version": current_app.config.get("APP_VERSION", "1.0.0"),
         "timestamp": current_app.config.get("START_TIME").strftime("%Y-%m-%d %H:%M:%S UTC"),
         "environment": current_app.config.get("ENVIRONMENT", "production"),
-        "status": "SUCCESS",
+        "status": "LIVE",
+        "record_type": "Application Runtime Metadata",
         "details": "Active application runtime",
     }]
 
@@ -389,8 +594,8 @@ def get_active_alerts(app, system_metrics, cicd_info, aws_info):
     if system_metrics.get("disk_used_pct", 0) > 85:
         alerts.append({
             "type": "warning",
-            "title": "High Disk Utilization Alert",
-            "message": f"Host disk space is at {system_metrics['disk_used_pct']}% utilization."
+            "title": "High Storage Capacity Alert",
+            "message": f"Host filesystem storage is at {system_metrics['disk_used_pct']}% utilization."
         })
     if not is_running_in_docker():
         alerts.append({
@@ -404,18 +609,15 @@ def get_active_alerts(app, system_metrics, cicd_info, aws_info):
             "title": "CI/CD Pipeline Failure",
             "message": f"Latest GitHub Actions workflow for commit {cicd_info.get('commit_sha')} failed."
         })
-    if not aws_info.get("connected"):
-        alerts.append({
-            "type": "secondary",
-            "title": "AWS Cloud Disconnected",
-            "message": "Local development / Render host. AWS EC2 metadata and CloudWatch Agent unavailable."
-        })
     return alerts
 
 
 @main_bp.route("/")
 def index():
     """Render the primary CloudDeploy home dashboard."""
+    is_docker = is_running_in_docker()
+    privilege = get_runtime_privilege()
+
     app_info = {
         "app_name": current_app.config["APP_NAME"],
         "version": current_app.config["APP_VERSION"],
@@ -423,7 +625,8 @@ def index():
         "deployment_id": current_app.config["DEPLOYMENT_ID"],
         "hosting_provider": current_app.config.get("HOSTING_PROVIDER", "render"),
         "aws_region": current_app.config["AWS_REGION"],
-        "is_container": is_running_in_docker(),
+        "is_container": is_docker,
+        "runtime_privilege": privilege["label"],
         "uptime_seconds": get_uptime_seconds(current_app),
         "os_platform": f"{platform.system()} {platform.release()}",
         "python_version": sys.version.split()[0],
@@ -437,6 +640,7 @@ def deployment():
     """Render the comprehensive CloudDeploy Monitoring & Diagnostics Dashboard."""
     repo = current_app.config.get("GITHUB_REPOSITORY", "ullas-reddy-g/CloudDeploy-AWS-CICD")
     is_docker = is_running_in_docker()
+    privilege = get_runtime_privilege()
 
     system_metrics = get_system_metrics()
     aws_info = get_aws_cloud_status()
@@ -448,6 +652,11 @@ def deployment():
     token = current_app.config.get("GITHUB_TOKEN")
     github_telemetry = fetch_github_workflows(repo, token=token, per_page=5)
 
+    # Render deployment status
+    service_id = current_app.config.get("RENDER_SERVICE_ID", "srv-dbqn4es9v7es73d40jag")
+    render_api_key = current_app.config.get("RENDER_API_KEY", "")
+    render_data = fetch_render_deployments(service_id, render_api_key, limit=5)
+
     dashboard_data = {
         "app_name": current_app.config["APP_NAME"],
         "version": current_app.config["APP_VERSION"],
@@ -456,7 +665,10 @@ def deployment():
         "hosting_provider": current_app.config.get("HOSTING_PROVIDER", "render"),
         "aws_region": current_app.config["AWS_REGION"],
         "is_container": is_docker,
-        "container_status": "Running (Isolated UID 10001)" if is_docker else "Host Execution (Local)",
+        "privilege": privilege,
+        "container_status": (
+            "Running in Docker Container (UID 10001)" if is_docker else "Host Python Process (Local Workstation)"
+        ),
         "uptime_seconds": get_uptime_seconds(current_app),
         "start_time": current_app.config["START_TIME"].strftime("%Y-%m-%d %H:%M:%S UTC"),
         "hostname": platform.node(),
@@ -465,8 +677,10 @@ def deployment():
         "aws_cloud": aws_info,
         "cicd": cicd_info,
         "github_telemetry": github_telemetry,
-        "history": deploy_history,
+        "render_telemetry": render_data,
+        "history": render_data.get("deployments", deploy_history),
         "alerts": alerts,
+        "render_service_id": service_id,
         "live_url": current_app.config.get("RENDER_EXTERNAL_URL", "https://clouddeploy-aws-cicd.onrender.com"),
     }
     return render_template("dashboard.html", info=dashboard_data)
@@ -489,8 +703,10 @@ def health():
         "status": "healthy",
         "app_name": current_app.config["APP_NAME"],
         "version": current_app.config["APP_VERSION"],
+        "commit_sha": current_app.config.get("DEPLOYMENT_ID", "local-build"),
         "timestamp": current_time_iso,
         "hosting_provider": current_app.config.get("HOSTING_PROVIDER", "render"),
+        "is_container": is_running_in_docker(),
         "uptime_seconds": get_uptime_seconds(current_app),
     }), 200
 
@@ -501,13 +717,16 @@ def api_info():
     Public non-sensitive application metadata endpoint.
     Guaranteed not to leak AWS secrets, credentials, or internal networks.
     """
+    privilege = get_runtime_privilege()
     return jsonify({
         "app_name": current_app.config["APP_NAME"],
         "version": current_app.config["APP_VERSION"],
         "environment": current_app.config["ENVIRONMENT"],
         "deployment_id": current_app.config["DEPLOYMENT_ID"],
+        "commit_sha": current_app.config.get("DEPLOYMENT_ID", "local-build"),
         "hosting_provider": current_app.config.get("HOSTING_PROVIDER", "render"),
         "is_container": is_running_in_docker(),
+        "runtime_privilege": privilege["label"],
         "uptime_seconds": get_uptime_seconds(current_app),
         "python_version": sys.version.split()[0],
         "status": "operational",
@@ -534,28 +753,33 @@ def api_deployments():
     Render cloud deployment status & history endpoint.
     Returns actual Render API deploys if configured, or honest integration status.
     """
-    service_id = current_app.config.get("RENDER_SERVICE_ID")
+    service_id = current_app.config.get("RENDER_SERVICE_ID", "srv-dbqn4es9v7es73d40jag")
     api_key = current_app.config.get("RENDER_API_KEY")
-    deploys = fetch_render_deployments(service_id, api_key, limit=5)
+    force = request.args.get("refresh", "false").lower() == "true"
+    deploys = fetch_render_deployments(service_id, api_key, limit=5, force_refresh=force)
     return jsonify(deploys), 200
 
 
 @main_bp.route("/api/monitoring")
 def api_monitoring():
     """Consolidated application, system, container, and hosting metrics."""
+    is_docker = is_running_in_docker()
+    privilege = get_runtime_privilege()
     return jsonify({
         "system": get_system_metrics(),
         "docker": {
-            "is_container": is_running_in_docker(),
+            "is_container": is_docker,
             "hostname": platform.node(),
+            "runtime_privilege": privilege["label"],
             "runtime_status": (
-                "Running (Isolated UID 10001)" if is_running_in_docker() else "Host Execution"
+                "Running in Docker Container (UID 10001)" if is_docker else "Host Python Process (Local Workstation)"
             ),
         },
         "hosting": {
             "provider": current_app.config.get("HOSTING_PROVIDER", "render"),
             "live_url": current_app.config.get("RENDER_EXTERNAL_URL", "https://clouddeploy-aws-cicd.onrender.com"),
             "environment": current_app.config.get("ENVIRONMENT", "production"),
+            "service_id": current_app.config.get("RENDER_SERVICE_ID", "srv-dbqn4es9v7es73d40jag"),
         },
         "uptime_seconds": get_uptime_seconds(current_app),
         "status": "healthy",

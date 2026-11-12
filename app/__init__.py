@@ -72,6 +72,8 @@ def create_app(config_name=None):
         app.config["RENDER_EXTERNAL_URL"] = os.getenv("RENDER_EXTERNAL_URL")
     if os.getenv("AWS_REGION"):
         app.config["AWS_REGION"] = os.getenv("AWS_REGION")
+    if os.getenv("DOCKER_CONTAINER"):
+        app.config["DOCKER_CONTAINER"] = os.getenv("DOCKER_CONTAINER", "").lower() in ("true", "1", "yes")
     if os.getenv("GITHUB_REPOSITORY"):
         app.config["GITHUB_REPOSITORY"] = os.getenv("GITHUB_REPOSITORY")
 

@@ -9,9 +9,9 @@ This document details the automated testing architecture, test categories, cover
 - **Test Framework:** Pytest 8.2.2
 - **Coverage Plugin:** pytest-cov 5.0.0
 - **Style & Quality Linter:** Flake8 7.1.0
-- **Total Test Cases:** **37**
-- **Pass Rate:** **37/37 Passed (100%)**
-- **Statement Coverage:** **100% (359/359 statements)** across all application modules.
+- **Total Test Cases:** **40**
+- **Pass Rate:** **40/40 Passed (100%)**
+- **Statement Coverage:** **100% (461/461 statements)** across all application modules.
 - **Flake8 Violations:** **0 violations** (PEP8 compliant with 120-character line length limit).
 
 ---
@@ -22,12 +22,12 @@ This document details the automated testing architecture, test categories, cover
 ---------- coverage: platform win32, python 3.11.5-final-0 -----------
 Name              Stmts   Miss  Cover   Missing
 -----------------------------------------------
-app\__init__.py      75      0   100%
-app\config.py        31      0   100%
-app\routes.py       253      0   100%
+app\__init__.py      77      0   100%
+app\config.py        32      0   100%
+app\routes.py       352      0   100%
 -----------------------------------------------
-TOTAL               359      0   100%
-============================= 37 passed in 2.28s ==============================
+TOTAL               461      0   100%
+============================= 40 passed in 1.35s ==============================
 ```
 
 ---
@@ -44,13 +44,18 @@ TOTAL               359      0   100%
 - `test_health_endpoint_payload`: Validates required JSON keys (`status`, `app_name`, `version`, `timestamp`, `hosting_provider`, `uptime_seconds`) and ISO 8601 formatting.
 - `test_api_info_endpoint`: Confirms non-sensitive operational metadata is exposed without leaking keys or credentials.
 
-### 3.3 Consolidated Telemetry & System Monitoring
+### 3.3 Container Detection & Resource Governance
+- `test_is_running_in_docker_helper`: Mocks `DOCKER_CONTAINER`, `CONTAINER`, `/etc/clouddeploy-container`, `/.dockerenv`, `/proc/self/cgroup`, `/proc/self/mountinfo`, and permission error handling to ensure deterministic detection inside containers and `False` on developer hosts.
+- `test_get_runtime_privilege_helper`: Validates process user privilege detection, confirming unprivileged non-root UID 10001 (`clouddeploy`), root UID 0 warning, and host developer execution.
+- `test_get_container_resource_limits_cgroup_v2`: Validates cgroup v2 parsing for memory limit (`memory.max`), current memory usage (`memory.current`), and CPU quota/period (`cpu.max`), confirming graceful handling when unconstrained ("max").
+- `test_get_container_resource_limits_cgroup_v1`: Validates legacy cgroup v1 parsing (`memory.limit_in_bytes`, `cpu.cfs_quota_us`, `cpu.cfs_period_us`).
+
+### 3.4 Consolidated Telemetry & System Monitoring
 - `test_api_system_metrics`: Tests `/api/system-metrics` backward-compatible endpoint.
-- `test_api_monitoring`: Verifies `/api/monitoring` consolidated metrics payload (system, docker, hosting, uptime).
+- `test_api_monitoring`: Verifies `/api/monitoring` consolidated metrics payload (system, docker, container cgroup limits, hosting, uptime).
 - `test_get_system_metrics_disk_and_mem`: Tests real disk calculations and `/proc/meminfo` memory parsing under success and error conditions.
 - `test_get_system_metrics_meminfo_exception`: Validates graceful fallback when memory stats are unavailable.
 - `test_get_uptime_seconds_helper`: Validates uptime calculation and fallback when `START_TIME` is missing.
-- `test_is_running_in_docker_helper`: Mocks `/.dockerenv` and `/proc/self/cgroup` to test container detection and permission error handling.
 
 ### 3.4 GitHub Actions REST API Telemetry
 - `test_parse_duration_seconds`: Tests ISO timestamp parsing and duration calculation in seconds.

@@ -7,6 +7,8 @@ from app import create_app
 from app.routes import (
     get_uptime_seconds,
     is_running_in_docker,
+    get_runtime_privilege,
+    get_container_resource_limits,
     get_system_metrics,
     get_aws_cloud_status,
     get_cicd_pipeline_status,
@@ -161,26 +163,131 @@ def test_get_uptime_seconds_helper(app):
 
 
 def test_is_running_in_docker_helper():
-    """Test container detection helper under different filesystem conditions."""
-    with patch("os.path.exists") as mock_exists:
-        mock_exists.side_effect = lambda p: p == "/.dockerenv"
+    """Test container detection helper under different filesystem and environment conditions."""
+    # 1. DOCKER_CONTAINER environment variable
+    with patch.dict(os.environ, {"DOCKER_CONTAINER": "true"}):
         assert is_running_in_docker() is True
 
-    with patch("os.path.exists") as mock_exists:
-        mock_exists.side_effect = lambda p: p == "/proc/self/cgroup"
-        with patch("builtins.open", mock_open(read_data="12:cpu:/docker/1234567890")):
+    # 2. CONTAINER environment variable
+    with patch.dict(os.environ, {"DOCKER_CONTAINER": "", "CONTAINER": "docker"}):
+        assert is_running_in_docker() is True
+
+    # 3. Marker files
+    with patch.dict(os.environ, {"DOCKER_CONTAINER": "", "CONTAINER": ""}):
+        with patch("os.path.exists") as mock_exists:
+            mock_exists.side_effect = lambda p: p == "/etc/clouddeploy-container"
             assert is_running_in_docker() is True
 
-    with patch("os.path.exists") as mock_exists:
-        mock_exists.side_effect = lambda p: p == "/proc/self/cgroup"
-        with patch("builtins.open", mock_open(read_data="12:cpu:/system.slice/init.scope")):
+        with patch("os.path.exists") as mock_exists:
+            mock_exists.side_effect = lambda p: p == "/.dockerenv"
+            assert is_running_in_docker() is True
+
+        # 4. cgroup keyword detection
+        with patch("os.path.exists") as mock_exists:
+            mock_exists.side_effect = lambda p: p == "/proc/self/cgroup"
+            with patch("builtins.open", mock_open(read_data="12:cpu:/docker/1234567890")):
+                assert is_running_in_docker() is True
+
+        # 5. mountinfo overlay keyword detection
+        with patch("os.path.exists") as mock_exists:
+            mock_exists.side_effect = lambda p: p == "/proc/self/mountinfo"
+            with patch("builtins.open", mock_open(read_data="50 1 0:40 / / rw,relatime - overlay overlay rw")):
+                assert is_running_in_docker() is True
+
+        # 6. Fallback when not in container
+        with patch("os.path.exists", return_value=False):
             assert is_running_in_docker() is False
 
-    with patch("os.path.exists", return_value=False):
-        assert is_running_in_docker() is False
+        # 7. Error handling
+        with patch("os.path.exists", side_effect=PermissionError("Mocked access error")):
+            assert is_running_in_docker() is False
 
-    with patch("os.path.exists", side_effect=PermissionError("Mocked access error")):
-        assert is_running_in_docker() is False
+        # 8. Open error handling on cgroup and mountinfo
+        with patch("os.path.exists", side_effect=lambda p: p in ("/proc/self/cgroup", "/proc/self/mountinfo")):
+            with patch("builtins.open", side_effect=PermissionError("Mocked file read error")):
+                assert is_running_in_docker() is False
+
+
+def test_get_runtime_privilege_helper():
+    """Test get_runtime_privilege under various UIDs and host execution."""
+    # Test UID 10001 (clouddeploy non-root)
+    with patch("os.getuid", return_value=10001, create=True):
+        priv = get_runtime_privilege()
+        assert priv["is_non_root"] is True
+        assert priv["uid"] == 10001
+        assert "UID 10001" in priv["label"]
+
+    # Test UID 0 (root warning)
+    with patch("os.getuid", return_value=0, create=True):
+        priv_root = get_runtime_privilege()
+        assert priv_root["is_non_root"] is False
+        assert priv_root["uid"] == 0
+        assert "Root User" in priv_root["label"]
+
+    # Test arbitrary non-root UID
+    with patch("os.getuid", return_value=1000, create=True):
+        priv_other = get_runtime_privilege()
+        assert priv_other["is_non_root"] is True
+        assert priv_other["uid"] == 1000
+
+    # Test system without getuid (e.g. Windows)
+    with patch.dict(os.environ, {"USERNAME": "testdev"}):
+        with patch("os.getuid", side_effect=AttributeError("No getuid on Windows"), create=True):
+            priv_win = get_runtime_privilege()
+            assert priv_win["is_non_root"] is True
+            assert priv_win["uid"] is None
+
+
+def test_get_container_resource_limits_cgroup_v2():
+    """Test container cgroup v2 resource limits inspection."""
+    def fake_exists(path):
+        return path in ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/cpu.max")
+
+    def fake_open(path, *args, **kwargs):
+        if path == "/sys/fs/cgroup/memory.max":
+            return mock_open(read_data="536870912\n")()  # 512 MB
+        elif path == "/sys/fs/cgroup/memory.current":
+            return mock_open(read_data="104857600\n")()  # 100 MB
+        elif path == "/sys/fs/cgroup/cpu.max":
+            return mock_open(read_data="10000 100000\n")()  # 0.1 vCPU
+        return mock_open(read_data="")()
+
+    with patch("os.path.exists", side_effect=fake_exists):
+        with patch("builtins.open", side_effect=fake_open):
+            limits = get_container_resource_limits()
+            assert limits["cgroup_version"] == "v2"
+            assert limits["container_memory_limit_mb"] == 512.0
+            assert limits["container_memory_usage_mb"] == 100.0
+            assert limits["container_cpu_limit_cores"] == 0.1
+
+
+def test_get_container_resource_limits_cgroup_v1():
+    """Test container cgroup v1 resource limits inspection."""
+    def fake_exists(path):
+        return path in (
+            "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+            "/sys/fs/cgroup/memory/memory.usage_in_bytes",
+            "/sys/fs/cgroup/cpu/cpu.cfs_quota_us",
+            "/sys/fs/cgroup/cpu/cpu.cfs_period_us"
+        )
+
+    def fake_open(path, *args, **kwargs):
+        if path == "/sys/fs/cgroup/memory/memory.limit_in_bytes":
+            return mock_open(read_data="268435456\n")()  # 256 MB
+        elif path == "/sys/fs/cgroup/memory/memory.usage_in_bytes":
+            return mock_open(read_data="52428800\n")()  # 50 MB
+        elif path == "/sys/fs/cgroup/cpu/cpu.cfs_quota_us":
+            return mock_open(read_data="50000\n")()
+        elif path == "/sys/fs/cgroup/cpu/cpu.cfs_period_us":
+            return mock_open(read_data="100000\n")()  # 0.5 vCPU
+        return mock_open(read_data="")()
+
+    with patch("os.path.exists", side_effect=fake_exists):
+        with patch("builtins.open", side_effect=fake_open):
+            limits = get_container_resource_limits()
+            assert limits["cgroup_version"] == "v1"
+            assert limits["container_memory_limit_mb"] == 256.0
+            assert limits["container_cpu_limit_cores"] == 0.5
 
 
 def test_get_system_metrics_disk_and_mem():
@@ -194,15 +301,15 @@ def test_get_system_metrics_disk_and_mem():
         mock_exists.side_effect = lambda p: p == "/proc/meminfo"
         with patch("builtins.open", mock_open(read_data=meminfo_content)):
             metrics = get_system_metrics()
-            assert metrics["mem_total"] != "unavailable"
-            assert "MB" in metrics["mem_total"]
+            assert "host_node" in metrics
+            assert metrics["host_node"]["physical_ram"] != "unavailable"
+            assert "MB" in metrics["host_node"]["physical_ram"]
 
     with patch("shutil.disk_usage", side_effect=OSError("Disk error")):
         with patch("os.path.exists", return_value=False):
             metrics = get_system_metrics()
             assert metrics["disk_total_gb"] == 0
             assert metrics["disk_used_pct"] == 0
-            assert metrics["mem_total"] == "unavailable"
 
 
 def test_get_aws_cloud_status_connected():
@@ -226,7 +333,7 @@ def test_get_aws_cloud_status_unconnected():
     with patch("urllib.request.urlopen", side_effect=OSError("IMDS timeout")):
         status = get_aws_cloud_status()
         assert status["connected"] is False
-        assert "Awaiting AWS Connection" in status["status"]
+        assert "Optional Extension" in status["status"]
 
 
 def test_parse_duration_seconds():
@@ -273,7 +380,6 @@ def test_fetch_github_workflows_success():
 
 def test_fetch_github_workflows_errors():
     """Test fetch_github_workflows under 403, 404, 500, and network error."""
-    # Reset cache
     import app.routes
     app.routes._github_cache["data"] = None
 
@@ -319,9 +425,10 @@ def test_fetch_render_deployments(app):
     """Test fetch_render_deployments with and without credentials."""
     with app.app_context():
         # Unconfigured
-        unconf = fetch_render_deployments("", "")
+        unconf = fetch_render_deployments("", "", force_refresh=True)
         assert unconf["integration_status"] == "unconfigured"
         assert unconf["provider"] == "Render (Cloud PaaS)"
+        assert unconf["record_type"] == "Application Runtime Metadata"
 
         # Connected
         sample_deploys = [{
@@ -339,14 +446,18 @@ def test_fetch_render_deployments(app):
         mock_resp.__enter__.return_value = mock_resp
 
         with patch("urllib.request.urlopen", return_value=mock_resp):
-            conn = fetch_render_deployments("srv-123", "rnd_testkey")
+            conn = fetch_render_deployments("srv-123", "rnd_testkey", force_refresh=True)
             assert conn["integration_status"] == "connected"
             assert len(conn["deployments"]) == 1
             assert conn["deployments"][0]["commit_id"] == "abcdef12"
 
+            # Cache hit test
+            cached_conn = fetch_render_deployments("srv-123", "rnd_testkey", force_refresh=False)
+            assert cached_conn["integration_status"] == "connected"
+
         # Error
         with patch("urllib.request.urlopen", side_effect=OSError("Render API unreachable")):
-            err_res = fetch_render_deployments("srv-123", "rnd_testkey")
+            err_res = fetch_render_deployments("srv-123", "rnd_testkey", force_refresh=True)
             assert err_res["integration_status"] == "error"
 
 
@@ -405,7 +516,7 @@ def test_get_deployment_history_corrupted_fallback(app):
             with app.app_context():
                 history = get_deployment_history()
                 assert len(history) == 1
-                assert history[0]["status"] == "SUCCESS"
+                assert history[0]["status"] == "LIVE"
 
 
 def test_disk_alert_rendered_in_dashboard(client):
@@ -419,11 +530,27 @@ def test_disk_alert_rendered_in_dashboard(client):
         "mem_total": "unavailable",
         "mem_available": "unavailable",
         "mem_used_pct": "unavailable",
+        "container": {
+            "memory_limit": "Metric unavailable in current hosting environment",
+            "memory_usage": "Metric unavailable in current hosting environment",
+            "cpu_allocation": "Shared Host Allocation",
+            "cgroup_version": "unavailable",
+        },
+        "host_node": {
+            "label": "Underlying Host Node Capacity",
+            "cpu_cores": "4 vCPU",
+            "physical_ram": "16384 MB",
+            "disk_total_gb": 100.0,
+            "disk_used_gb": 90.0,
+            "disk_free_gb": 10.0,
+            "disk_used_pct": 90.0,
+            "disk_scope": "Host Root Filesystem",
+        }
     }
     with patch("app.routes.get_system_metrics", return_value=mock_metrics):
         response = client.get("/deployment")
         assert response.status_code == 200
-        assert b"High Disk Utilization Alert" in response.data
+        assert b"High Storage Capacity Alert" in response.data
 
 
 def test_get_active_alerts_variations(app):
@@ -461,6 +588,7 @@ def test_create_app_env_overrides():
         "RENDER_SERVICE_ID": "srv-test-99",
         "RENDER_EXTERNAL_URL": "https://test.onrender.com",
         "AWS_REGION": "eu-west-1",
+        "DOCKER_CONTAINER": "true",
         "GITHUB_REPOSITORY": "ullas-reddy-g/CloudDeploy-AWS-CICD",
     }
     with patch.dict(os.environ, env_vars):
@@ -471,6 +599,7 @@ def test_create_app_env_overrides():
         assert custom_app.config["RENDER_SERVICE_ID"] == "srv-test-99"
         assert custom_app.config["RENDER_EXTERNAL_URL"] == "https://test.onrender.com"
         assert custom_app.config["AWS_REGION"] == "eu-west-1"
+        assert custom_app.config["DOCKER_CONTAINER"] is True
         assert custom_app.config["GITHUB_REPOSITORY"] == "ullas-reddy-g/CloudDeploy-AWS-CICD"
 
 
@@ -479,7 +608,7 @@ def test_get_system_metrics_meminfo_exception():
     with patch("os.path.exists", return_value=True):
         with patch("builtins.open", side_effect=PermissionError("meminfo locked")):
             metrics = get_system_metrics()
-            assert metrics["mem_total"] == "unavailable"
+            assert metrics["host_node"]["physical_ram"] == "unavailable"
 
 
 def test_fetch_github_workflows_fallback_with_existing_cache():

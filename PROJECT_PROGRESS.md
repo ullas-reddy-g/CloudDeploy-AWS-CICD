@@ -63,19 +63,24 @@ Gunicorn WSGI Server (Port 8000) ──> Public HTTPS: https://clouddeploy-aws-c
 - [x] Implement route, UI, navigation, API, cache, and error handler tests in `tests/test_app.py`.
 - [x] Implement health and non-sensitive API tests in `tests/test_health.py`.
 - [x] Execute `pytest -v` and verify 100% test pass rate locally:
-  - **37/37 tests passed** in `2.28s`
-  - **100% statement coverage** across all application modules (`app/__init__.py`, `app/config.py`, `app/routes.py` — 359/359 statements)
+  - **40/40 tests passed** in `1.35s`
+  - **100% statement coverage** across all application modules (`app/__init__.py`, `app/config.py`, `app/routes.py` — 461/461 statements)
   - **0 Flake8 lint violations**
 
 ### Phase 4: Containerization & Reverse Proxy
 - [x] Create production-grade `Dockerfile` with non-root security user (UID 10001), lightweight Python 3.11 slim base, dynamic build-args (`APP_VERSION`, `DEPLOYMENT_ID`), and Gunicorn entrypoint.
+- [x] Add deterministic container identification markers in `Dockerfile`: `ENV DOCKER_CONTAINER=true` and `RUN touch /etc/clouddeploy-container && chmod 644 /etc/clouddeploy-container`.
+- [x] Add `DOCKER_CONTAINER=true` to `docker-compose.yml` for local container orchestration.
+- [x] Implement multi-signal container detection in `app/routes.py` (`DOCKER_CONTAINER` / `CONTAINER` env vars, `/etc/clouddeploy-container`, `/.dockerenv`, `/proc/self/cgroup` keywords, and `/proc/self/mountinfo` overlay signature) while correctly returning `False` on the local developer workstation.
+- [x] Implement genuine Linux cgroup v1 and cgroup v2 container limit extraction for memory and CPU, gracefully returning `"Metric unavailable in current hosting environment"` when unconstrained or unexposed on free tier.
+- [x] Implement runtime privilege detection verifying non-root UID 10001 (`clouddeploy`) inside the container and host execution outside.
 - [x] Create `.dockerignore` to avoid copying build artifacts, secrets, and caches.
 - [x] Create `nginx/nginx.conf` reverse proxy configuration with CloudWatch JSON logging, security headers, and upstream pass-through.
 - [x] Create `docker-compose.yml` orchestrating web application and Nginx reverse proxy with healthcheck dependencies.
 
 ### Phase 5: CI/CD Workflows (GitHub Actions)
 - [x] Create `.github/workflows/ci.yml` for automated linting, tests with coverage enforcement (>=80%), Docker image build, container health check test, non-root UID 10001 verification, and Docker Compose validation.
-- [x] Create `.github/workflows/cd.yml` for continuous delivery to Render Cloud with automated deployment and live health verification.
+- [x] Create `.github/workflows/cd.yml` for continuous delivery to Render Cloud with automated deployment and live health verification, preventing duplicate parallel builds by detecting native commit triggers.
 - [x] Create `.github/workflows/aws-deploy-optional.yml` preserving optional manual AWS deployment via OIDC, ECR, and EC2 SSM.
 
 ### Phase 6: AWS Infrastructure, Security & Deployment Scripts (Optional Extension)
@@ -90,7 +95,7 @@ Gunicorn WSGI Server (Port 8000) ──> Public HTTPS: https://clouddeploy-aws-c
 - [x] Write comprehensive `README.md` with full operational guide and Mermaid diagrams.
 - [x] Write `docs/ARCHITECTURE.md` detailing system design, security, and data flow.
 - [x] Write `docs/DEPLOYMENT.md` providing step-by-step instructions for Render and local Docker setup.
-- [x] Write `docs/TESTING.md` detailing test categories and 100% statement coverage breakdown.
+- [x] Write `docs/TESTING.md` detailing test categories and 100% statement coverage breakdown (40/40 tests, 461/461 statements).
 - [x] Write `docs/SECURITY.md` detailing security audit findings, non-root execution, and OIDC principles.
 - [x] Create `docs/screenshots/README.md` documenting visual evidence catalog.
 
@@ -101,15 +106,17 @@ Gunicorn WSGI Server (Port 8000) ──> Public HTTPS: https://clouddeploy-aws-c
 | Component | Status | Verification Detail / Evidence |
 |---|---|---|
 | **Flask Application** | **COMPLETED AND VERIFIED** | Factory pattern, routes, error handlers, and structured logging. Tested via pytest and local test client. |
-| **Frontend UI** | **COMPLETED AND VERIFIED** | Bootstrap 5.3 UI templates, CSS styling, AJAX health polling, KPI cards, and diagnostics panel. |
-| **Automated Tests** | **COMPLETED AND VERIFIED** | 37/37 tests passing in 2.28s, **100% statement coverage (359/359 statements)**, 0 Flake8 errors. |
-| **Docker Build** | **COMPLETED AND VERIFIED** | Multi-stage Dockerfile with UID 10001, Python 3.11-slim, Gunicorn WSGI. Verified in CI workflow run 43173668541. |
+| **Frontend UI** | **COMPLETED AND VERIFIED** | Bootstrap 5.3 UI templates, CSS styling, AJAX health polling, KPI cards, Sections A-H diagnostics panel. |
+| **Automated Tests** | **COMPLETED AND VERIFIED** | 40/40 tests passing in 1.35s, **100% statement coverage (461/461 statements)**, 0 Flake8 errors. |
+| **Docker Build** | **COMPLETED AND VERIFIED** | Multi-stage Dockerfile with UID 10001, Python 3.11-slim, Gunicorn WSGI, `DOCKER_CONTAINER=true` marker. Verified in CI. |
 | **Docker Compose** | **COMPLETED AND VERIFIED** | `docker-compose.yml` orchestrates web app + Nginx proxy with service health dependencies. Verified in CI workflow. |
 | **Local Git Repository** | **COMPLETED AND VERIFIED** | Git repository initialized on `main` branch with clean history and `.gitignore` preventing secret leakage. |
-| **GitHub Actions CI** | **COMPLETED AND VERIFIED** | `.github/workflows/ci.yml` validates Flake8, Pytest (100% cov), container build, UID 10001, and Compose proxy test. Verified passing on GitHub. |
-| **GitHub Actions CD** | **COMPLETED AND VERIFIED** | `.github/workflows/cd.yml` configured for Render Cloud deployment and healthcheck verification. |
+| **GitHub Actions CI** | **COMPLETED AND VERIFIED** | `.github/workflows/ci.yml` validates Flake8, Pytest (100% cov), container build, UID 10001, and Compose proxy test. |
+| **GitHub Actions CD** | **COMPLETED AND VERIFIED** | `.github/workflows/cd.yml` configured for Render Cloud deployment, SHA verification, and healthcheck verification without duplicate builds. |
 | **Render Production Hosting** | **COMPLETED AND VERIFIED** | Publicly accessible at `https://clouddeploy-aws-cicd.onrender.com` returning HTTP 200 on `/health` and `/api/info`. |
-| **Real GitHub API Telemetry**| **COMPLETED AND VERIFIED** | Live integration on `/api/github/workflows` querying GitHub REST API with 30s in-memory cache and rate limit handling. |
-| **Render API Integration** | **COMPLETED AND VERIFIED** | `/api/deployments` endpoint handles both authenticated Render API queries and native Git-push fallback. |
+| **Container Detection** | **COMPLETED AND VERIFIED** | Deterministic container markers (`DOCKER_CONTAINER`, `/etc/clouddeploy-container`) return `true` in container, `false` on host workstation. |
+| **cgroup Resource Limits** | **COMPLETED AND VERIFIED** | Genuine cgroup v1/v2 parsing for container memory & CPU; displays "Metric unavailable in current hosting environment" when unconstrained. |
+| **Real GitHub API Telemetry**| **COMPLETED AND VERIFIED** | Live integration on `/api/github/workflows` querying GitHub REST API with 60s in-memory cache and 403 rate limit handling. |
+| **Render API Integration** | **COMPLETED AND VERIFIED** | `/api/deployments` endpoint handles authenticated Render API queries and native Git-push fallback with record type badges. |
 | **Log Sanitization** | **COMPLETED AND VERIFIED** | `/api/logs` sanitizes and redacts all secret tokens before streaming. |
 | **AWS Extension Code** | **IMPLEMENTED BUT NOT VERIFIED** | Full infrastructure code in `deployment/aws/` preserved for enterprise demonstration without incurring cloud costs. |

@@ -16,14 +16,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PORT=8000 \
     ENVIRONMENT=production \
     APP_VERSION=${APP_VERSION} \
-    DEPLOYMENT_ID=${DEPLOYMENT_ID}
+    DEPLOYMENT_ID=${DEPLOYMENT_ID} \
+    DOCKER_CONTAINER=true
 
 # Install essential runtime utilities and create unprivileged application user
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 10001 clouddeploy \
-    && useradd -u 10001 -g clouddeploy -m -s /bin/bash clouddeploy
+    && useradd -u 10001 -g clouddeploy -m -s /bin/bash clouddeploy \
+    && touch /etc/clouddeploy-container \
+    && chmod 644 /etc/clouddeploy-container
 
 # Set working directory
 WORKDIR /app

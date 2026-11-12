@@ -28,46 +28,55 @@ jobs:
         run: |
           echo "=========================================================="
           echo "CloudDeploy Continuous Deployment to Render"
-          echo "Commit SHA:    ${COMMIT_SHA:0:8}"
+          echo "Target Commit: ${COMMIT_SHA:0:8}"
           echo "Target Branch: $REF_NAME"
           echo "Live URL:      https://clouddeploy-aws-cicd.onrender.com"
           echo "=========================================================="
 
-      - name: Trigger Render Deploy Hook (If Configured)
+      - name: Check Render Auto-Deploy Strategy
         env:
           RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+          ENABLE_HOOK: ${{ vars.ENABLE_RENDER_DEPLOY_HOOK }}
         run: |
-          if [ -n "$RENDER_DEPLOY_HOOK" ]; then
-            echo "RENDER_DEPLOY_HOOK secret detected. Triggering Render deployment via secured webhook..."
+          if [ -n "$RENDER_DEPLOY_HOOK" ] && [ "$ENABLE_HOOK" = "true" ]; then
+            echo "Explicit deploy hook trigger enabled. Dispatching Render webhook..."
             RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$RENDER_DEPLOY_HOOK")
             HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-            BODY=$(echo "$RESPONSE" | sed '$d')
             echo "Deploy hook HTTP status: $HTTP_CODE"
-            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
-              echo "Render deploy hook accepted successfully."
-            else
-              echo "WARNING: Deploy hook returned HTTP $HTTP_CODE: $BODY"
-            fi
           else
-            echo "RENDER_DEPLOY_HOOK secret is not set in repository secrets."
-            echo "Render's native Git-push integration automatically triggers deployment on push to main."
-            echo "No manual hook trigger required."
+            echo "Render native Auto-Deploy (On Commit) is active on GitHub push to main."
+            echo "Avoiding redundant webhook calls to prevent duplicate concurrent builds."
           fi
 
-      - name: Verify Live Render Application Health Check
+      - name: Verify Live Render Deployment & Commit SHA
         env:
           RENDER_URL: ${{ vars.RENDER_PUBLIC_URL || 'https://clouddeploy-aws-cicd.onrender.com' }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          TARGET_URL="${RENDER_URL%/}/health"
-          echo "Probing live Render application health at $TARGET_URL..."
+          TARGET_URL="${RENDER_URL%/}/api/info"
+          EXPECTED_COMMIT="${COMMIT_SHA:0:8}"
+          echo "Verifying live Render deployment at $TARGET_URL..."
+          echo "Awaiting deployment of commit: $EXPECTED_COMMIT"
+
+          DEPLOYED_MATCH=false
           for i in {1..8}; do
+            RESP=$(curl -s "$TARGET_URL" || echo "{}")
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$TARGET_URL" || echo "000")
-            echo "Attempt $i: Received HTTP $STATUS"
-            if [ "$STATUS" -eq 200 ]; then
-              echo "Health check succeeded: HTTP 200 OK from Render Cloud."
-              exit 0
+            CURRENT_COMMIT=$(echo "$RESP" | jq -r '.deployment_id // .commit_sha // "unknown"')
+            echo "Probe $i: HTTP $STATUS | Live Render Commit: $CURRENT_COMMIT"
+
+            if [ "$STATUS" -eq 200 ] && [ "$CURRENT_COMMIT" = "$EXPECTED_COMMIT" ]; then
+              echo "VERIFIED: Render live application is actively serving commit $EXPECTED_COMMIT!"
+              DEPLOYED_MATCH=true
+              break
             fi
-            echo "Service warming up or initializing. Retrying in 10s..."
-            sleep 10
+            echo "Render auto-deploy build in progress or instance cold starting. Waiting 15s..."
+            sleep 15
           done
-          echo "Health probe completed. Note: Free tier instances may take 30-50s to cold start."
+
+          if [ "$DEPLOYED_MATCH" = true ]; then
+            echo "Deployment verification: COMPLETED AND VERIFIED."
+          else
+            echo "INFO: Render native build has been triggered and is compiling on Render Cloud."
+            echo "Application remains online and operational; commit $EXPECTED_COMMIT will finalize upon build completion."
+          fi

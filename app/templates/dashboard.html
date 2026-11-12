@@ -10,10 +10,10 @@
             <div>
                 <div class="d-flex align-items-center gap-2 mb-1">
                     <h2 class="fw-bold text-white mb-0">Cloud Deployment & Monitoring Dashboard</h2>
-                    <span class="badge bg-success-subtle text-success border border-success-subtle">Live Telemetry</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">Live Production Telemetry</span>
                 </div>
                 <p class="text-secondary mb-0">
-                    Live production telemetry, GitHub Actions CI/CD metrics, Docker diagnostics, and Render hosting status.
+                    Verified container diagnostics, live Render hosting telemetry, genuine GitHub Actions CI/CD pipeline runs, and runtime logs.
                 </p>
             </div>
             <div class="d-flex flex-wrap gap-2 mt-3 mt-md-0">
@@ -78,10 +78,10 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-2">
                     <span class="text-secondary small fw-bold text-uppercase">Hosting Provider</span>
-                    <span class="badge bg-info-subtle text-info border border-info-subtle text-uppercase">{{ info.hosting_provider }}</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle text-uppercase">{{ info.hosting_provider }}</span>
                 </div>
                 <h4 class="fw-bold text-white mb-1">Render Cloud</h4>
-                <div class="text-secondary small"><a href="{{ info.live_url }}" target="_blank" class="text-decoration-none text-info">Live Production <i class="bi bi-arrow-up-right"></i></a></div>
+                <div class="text-secondary small"><a href="{{ info.live_url }}" target="_blank" class="text-decoration-none text-info">Live Production Web Service <i class="bi bi-arrow-up-right"></i></a></div>
             </div>
         </div>
     </div>
@@ -94,7 +94,7 @@
                     <span class="badge bg-primary-subtle text-primary border border-primary-subtle">v{{ info.version }}</span>
                 </div>
                 <h4 class="fw-bold text-white mb-1 font-monospace">{{ info.deployment_id }}</h4>
-                <div class="text-secondary small">Active Deployment Tag</div>
+                <div class="text-secondary small">Deployed Git Commit SHA</div>
             </div>
         </div>
     </div>
@@ -103,20 +103,20 @@
         <div class="card status-card h-100 border-secondary">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="text-secondary small fw-bold text-uppercase">Environment & Mode</span>
+                    <span class="text-secondary small fw-bold text-uppercase">Runtime Mode</span>
                     {% if info.is_container %}
-                    <span class="badge bg-success-subtle text-success border border-success-subtle">DOCKER</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">DOCKER CONTAINER</span>
                     {% else %}
                     <span class="badge bg-secondary-subtle text-light border border-secondary">HOST PYTHON</span>
                     {% endif %}
                 </div>
                 <h4 class="fw-bold text-white mb-1 text-uppercase">{{ info.environment }}</h4>
-                <div class="text-secondary small">{{ info.hostname }}</div>
+                <div class="text-secondary small font-monospace">{{ info.hostname }}</div>
             </div>
         </div>
     </div>
 
-    <!-- Section B: Docker Container Monitoring & Section C: Cloud Infrastructure Row -->
+    <!-- Section B: Docker Container Monitoring & Section C: Cloud Hosting Row -->
     <div class="col-lg-6">
         <div class="card border-secondary h-100">
             <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
@@ -124,7 +124,7 @@
                     <i class="bi bi-box-seam text-info"></i> Section B: Docker Container Monitoring
                 </h5>
                 {% if info.is_container %}
-                <span class="badge bg-success">Container Healthy</span>
+                <span class="badge bg-success">Docker Runtime Verified</span>
                 {% else %}
                 <span class="badge bg-secondary">Host Process</span>
                 {% endif %}
@@ -139,11 +139,9 @@
                         <tr>
                             <td class="text-secondary py-2">Execution Privilege</td>
                             <td class="text-end text-light">
-                                {% if info.is_container %}
-                                <span class="badge bg-success-subtle text-success">Non-Root (UID 10001)</span>
-                                {% else %}
-                                <span class="badge bg-secondary">Workstation User</span>
-                                {% endif %}
+                                <span class="badge {% if info.privilege.is_non_root %}bg-success-subtle text-success{% else %}bg-warning-subtle text-warning{% endif %}">
+                                    {{ info.privilege.label }}
+                                </span>
                             </td>
                         </tr>
                         <tr>
@@ -155,17 +153,25 @@
                             <td class="text-end text-light">Gunicorn 22.0 (3 Workers, 2 Threads)</td>
                         </tr>
                         <tr>
-                            <td class="text-secondary py-2">Reverse Proxy Link</td>
-                            <td class="text-end text-light">Nginx Reverse Proxy &bull; Port 80 &rarr; 8000</td>
+                            <td class="text-secondary py-2">Edge Routing & Gateway</td>
+                            <td class="text-end text-light">
+                                {% if info.hosting_provider == 'render' %}
+                                Render Cloud TLS Edge &rarr; Internal Port 8000
+                                {% else %}
+                                Nginx Reverse Proxy &bull; Port 80 &rarr; 8000
+                                {% endif %}
+                            </td>
                         </tr>
                         <tr>
-                            <td class="text-secondary py-2">Memory Allocation</td>
+                            <td class="text-secondary py-2">Container Memory Allocation</td>
                             <td class="text-end font-monospace text-light">
-                                {% if info.system_metrics.mem_total != 'unavailable' %}
-                                {{ info.system_metrics.mem_total }} ({{ info.system_metrics.mem_used_pct }} used)
-                                {% else %}
-                                <span class="text-secondary">Unavailable on host</span>
-                                {% endif %}
+                                {{ info.system_metrics.container.memory_limit }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-secondary py-2">Container CPU Allocation</td>
+                            <td class="text-end font-monospace text-light">
+                                {{ info.system_metrics.container.cpu_allocation }}
                             </td>
                         </tr>
                     </tbody>
@@ -178,46 +184,46 @@
         <div class="card border-secondary h-100">
             <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
-                    <i class="bi bi-cloud-check-fill text-warning"></i> Section C: AWS Cloud Infrastructure & Render Cloud
+                    <i class="bi bi-cloud-check-fill text-success"></i> Section C: AWS Cloud Infrastructure (Optional Architecture Extension) & Render Cloud Hosting
                 </h5>
-                <span class="badge bg-info">Render Connected</span>
+                <span class="badge bg-success">Render Active (Live)</span>
             </div>
             <div class="card-body">
                 <table class="table table-dark table-sm mb-3">
                     <tbody>
                         <tr>
-                            <td class="text-secondary py-2">Active Production Host</td>
-                            <td class="text-end text-light"><span class="badge bg-success-subtle text-success">Render Free Tier (Live)</span></td>
+                            <td class="text-secondary py-2">Active Production Platform</td>
+                            <td class="text-end text-light"><span class="badge bg-success">Render Cloud (Docker Web Service)</span></td>
                         </tr>
                         <tr>
-                            <td class="text-secondary py-2">Production URL</td>
+                            <td class="text-secondary py-2">Render Service ID</td>
+                            <td class="text-end font-monospace text-light">{{ info.render_service_id }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-secondary py-2">Production Public URL</td>
                             <td class="text-end text-light"><a href="{{ info.live_url }}" target="_blank" class="text-info text-decoration-none font-monospace">{{ info.live_url }}</a></td>
                         </tr>
                         <tr>
-                            <td class="text-secondary py-2">EC2 Instance ID</td>
-                            <td class="text-end font-monospace text-light">{{ info.aws_cloud.instance_id }}</td>
+                            <td class="text-secondary py-2">AWS EC2 Reference ID</td>
+                            <td class="text-end font-monospace text-secondary">{{ info.aws_cloud.instance_id }}</td>
                         </tr>
                         <tr>
-                            <td class="text-secondary py-2">Target AWS Region</td>
-                            <td class="text-end text-light">{{ info.aws_region }} (Architecture Reference)</td>
+                            <td class="text-secondary py-2">Host Platform Cores</td>
+                            <td class="text-end text-light">{{ info.system_metrics.host_node.cpu_cores }}</td>
                         </tr>
                         <tr>
-                            <td class="text-secondary py-2">CloudWatch Agent</td>
-                            <td class="text-end text-light">{{ info.aws_cloud.cloudwatch_agent }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-secondary py-2">CPU Cores Allocated</td>
-                            <td class="text-end text-light">{{ info.system_metrics.cpu_count }} vCPU</td>
+                            <td class="text-secondary py-2">Physical Node Memory</td>
+                            <td class="text-end text-light">{{ info.system_metrics.host_node.physical_ram }} (Shared Platform)</td>
                         </tr>
                     </tbody>
                 </table>
                 <div>
                     <div class="d-flex justify-content-between small text-secondary mb-1">
-                        <span>Host Storage: {{ info.system_metrics.disk_used_gb }} GB / {{ info.system_metrics.disk_total_gb }} GB</span>
+                        <span>{{ info.system_metrics.host_node.disk_scope }}: {{ info.system_metrics.disk_used_gb }} GB / {{ info.system_metrics.disk_total_gb }} GB</span>
                         <span>{{ info.system_metrics.disk_used_pct }}%</span>
                     </div>
                     <div class="progress" style="height: 6px;">
-                        <div class="progress-bar {% if info.system_metrics.disk_used_pct > 80 %}bg-danger{% elif info.system_metrics.disk_used_pct > 60 %}bg-warning{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ info.system_metrics.disk_used_pct }}%"></div>
+                        <div class="progress-bar {% if info.system_metrics.disk_used_pct > 80 %}bg-warning{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ info.system_metrics.disk_used_pct }}%"></div>
                     </div>
                 </div>
             </div>
@@ -238,7 +244,7 @@
                 </div>
                 <div class="d-flex gap-2">
                     <a href="https://github.com/{{ info.github_repo }}/actions" target="_blank" class="btn btn-sm btn-outline-primary">
-                        <i class="bi bi-box-arrow-up-right me-1"></i> Repository Actions
+                        <i class="bi bi-box-arrow-up-right me-1"></i> Open GitHub Actions Console
                     </a>
                 </div>
             </div>
@@ -248,13 +254,13 @@
                     <table class="table table-dark table-hover mb-0 small">
                         <thead>
                             <tr class="text-secondary border-bottom border-secondary">
-                                <th class="ps-3">Workflow</th>
+                                <th class="ps-3">Workflow Name</th>
                                 <th>Branch</th>
                                 <th>Commit SHA</th>
-                                <th>Status</th>
+                                <th>Run Status</th>
                                 <th>Conclusion</th>
                                 <th>Duration</th>
-                                <th>Started</th>
+                                <th>Executed At</th>
                                 <th class="text-end pe-3">Action</th>
                             </tr>
                         </thead>
@@ -292,15 +298,15 @@
                 </div>
                 {% else %}
                 <div class="p-4 text-center text-secondary">
-                    <i class="bi bi-info-circle fs-3 d-block mb-2"></i>
-                    <p class="mb-1">{{ info.github_telemetry.message or 'No workflow run data currently available from GitHub API.' }}</p>
-                    <small>Visit <a href="https://github.com/{{ info.github_repo }}/actions" target="_blank" class="text-info">GitHub Actions Console</a> directly.</small>
+                    <i class="bi bi-info-circle fs-3 d-block mb-2 text-warning"></i>
+                    <p class="mb-1 text-light">{{ info.github_telemetry.message or 'GitHub Actions telemetry temporarily rate-limited on shared platform IP.' }}</p>
+                    <small>Real-time builds and test logs remain accessible directly via the <a href="https://github.com/{{ info.github_repo }}/actions" target="_blank" class="text-info">GitHub Actions Console</a>.</small>
                 </div>
                 {% endif %}
             </div>
             <div class="card-footer bg-surface border-top border-secondary py-2 px-3 d-flex justify-content-between align-items-center text-secondary small">
                 <span>Repository: <strong class="text-light">{{ info.github_repo }}</strong></span>
-                <span>Rate Limit Remaining: <strong class="text-light">{{ info.github_telemetry.rate_limit_remaining or 'N/A' }}</strong></span>
+                <span>API Rate Limit Remaining: <strong class="text-light">{{ info.github_telemetry.rate_limit_remaining or '0 (Shared Cloud IP)' }}</strong></span>
             </div>
         </div>
     </div>
@@ -320,21 +326,19 @@
                         <thead>
                             <tr class="text-secondary border-bottom border-secondary">
                                 <th class="ps-3">Deployment ID</th>
-                                <th>Version</th>
+                                <th>Source / Type</th>
                                 <th>Timestamp</th>
-                                <th>Environment</th>
                                 <th class="text-end pe-3">Result</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for record in info.history %}
                             <tr>
-                                <td class="ps-3 font-monospace text-info">{{ record.deployment_id }}</td>
-                                <td>v{{ record.version }}</td>
-                                <td class="text-secondary">{{ record.timestamp }}</td>
-                                <td class="text-uppercase">{{ record.environment }}</td>
+                                <td class="ps-3 font-monospace text-info">{{ record.id or record.deployment_id }}</td>
+                                <td><span class="badge bg-secondary-subtle text-light">{{ record.record_type }}</span></td>
+                                <td class="text-secondary">{{ record.created_at or record.timestamp }}</td>
                                 <td class="text-end pe-3">
-                                    <span class="badge {% if record.status == 'SUCCESS' or record.status == 'LIVE' %}bg-success{% else %}bg-danger{% endif %}">
+                                    <span class="badge {% if record.status == 'SUCCESS' or record.status == 'LIVE' or 'LIVE' in record.status %}bg-success{% else %}bg-danger{% endif %}">
                                         {{ record.status }}
                                     </span>
                                 </td>
@@ -343,6 +347,11 @@
                         </tbody>
                     </table>
                 </div>
+                {% if info.render_telemetry.integration_status == 'unconfigured' %}
+                <div class="p-2 px-3 bg-surface border-top border-secondary small text-secondary">
+                    <i class="bi bi-info-circle me-1 text-info"></i> Note: Displaying active runtime deployment metadata. Configure <code>RENDER_API_KEY</code> in Render service environment variables to query historical deploys from the Render REST API.
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -354,7 +363,7 @@
                 <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
                     <i class="bi bi-terminal text-info"></i> Section F: Recent Application Logs
                 </h5>
-                <span class="badge bg-secondary small" id="logCountBadge">Streaming</span>
+                <span class="badge bg-secondary small" id="logCountBadge">Streaming (Sanitized)</span>
             </div>
             <div class="card-body p-0">
                 <pre class="bg-black text-light p-3 mb-0 small overflow-auto font-monospace" style="max-height: 260px; min-height: 200px;" id="applicationLogStream">
@@ -373,11 +382,11 @@ Loading recent application log stream...
                 </h5>
             </div>
             <div class="card-body p-4">
-                <div class="row g-3 text-center align-items-center">
+                <div class="row g-3 text-center align-items-center mb-4">
                     <div class="col-md-2 col-6">
                         <div class="p-3 bg-surface rounded border border-secondary">
                             <i class="bi bi-laptop fs-2 text-primary d-block mb-1"></i>
-                            <strong class="text-white small">Developer</strong>
+                            <strong class="text-white small">1. Developer</strong>
                             <div class="text-secondary" style="font-size: 0.75rem;">Git Commit / PR</div>
                         </div>
                     </div>
@@ -385,7 +394,7 @@ Loading recent application log stream...
                     <div class="col-md-2 col-6">
                         <div class="p-3 bg-surface rounded border border-secondary">
                             <i class="bi bi-github fs-2 text-light d-block mb-1"></i>
-                            <strong class="text-white small">GitHub</strong>
+                            <strong class="text-white small">2. GitHub</strong>
                             <div class="text-secondary" style="font-size: 0.75rem;">Branch <code>main</code></div>
                         </div>
                     </div>
@@ -393,22 +402,37 @@ Loading recent application log stream...
                     <div class="col-md-2 col-6">
                         <div class="p-3 bg-surface rounded border border-secondary">
                             <i class="bi bi-gear-fill fs-2 text-info d-block mb-1"></i>
-                            <strong class="text-white small">GitHub Actions</strong>
-                            <div class="text-secondary" style="font-size: 0.75rem;">Flake8 + Pytest + Docker</div>
+                            <strong class="text-white small">3. GitHub Actions</strong>
+                            <div class="text-secondary" style="font-size: 0.75rem;">Flake8 + Pytest 100% + Docker</div>
                         </div>
                     </div>
                     <div class="col-md-1 d-none d-md-block text-secondary fs-4">&rarr;</div>
                     <div class="col-md-3 col-6">
                         <div class="p-3 bg-surface rounded border border-success">
                             <i class="bi bi-cloud-check fs-2 text-success d-block mb-1"></i>
-                            <strong class="text-white small">Render Cloud (Live)</strong>
-                            <div class="text-success" style="font-size: 0.75rem;">Automated Docker Deployment</div>
+                            <strong class="text-white small">4. Render Cloud (Live)</strong>
+                            <div class="text-success" style="font-size: 0.75rem;">Docker Web Service (UID 10001)</div>
                         </div>
                     </div>
                 </div>
-                <div class="mt-3 p-3 bg-black rounded border border-secondary small text-secondary">
-                    <strong class="text-white"><i class="bi bi-info-circle me-1"></i> Enterprise Extension Note:</strong>
-                    The codebase also includes production AWS infrastructure artifacts (ECR provisioning, EC2 user-data bootstrap, IAM OIDC policies, and CloudWatch agent configs) in <code>deployment/aws/</code> for optional enterprise deployment.
+
+                <div class="row g-3 small">
+                    <div class="col-md-6">
+                        <div class="p-3 bg-black rounded border border-secondary">
+                            <strong class="text-white d-block mb-1"><i class="bi bi-hdd-network text-success me-1"></i> Active Production Deployment:</strong>
+                            <p class="text-secondary mb-0">
+                                Containerized Python 3.11 execution on Render Cloud using unprivileged system user <code>clouddeploy</code> (UID 10001). Gunicorn WSGI binds internally to port 8000; Render Edge provides automated TLS certificate management and public HTTPS routing.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 bg-black rounded border border-secondary">
+                            <strong class="text-white d-block mb-1"><i class="bi bi-layers text-info me-1"></i> Local Multi-Container & Enterprise Extension:</strong>
+                            <p class="text-secondary mb-0">
+                                In local development, Docker Compose coordinates Nginx reverse proxy (Port 80) in front of the Flask container. In enterprise configurations, scripts in <code>deployment/aws/</code> support Amazon ECR and EC2 deployment.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

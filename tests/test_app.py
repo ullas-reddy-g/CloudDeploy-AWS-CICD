@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import urllib.error
 from unittest.mock import patch, mock_open, MagicMock
 from app import create_app
 from app.routes import (
@@ -10,6 +11,10 @@ from app.routes import (
     get_aws_cloud_status,
     get_cicd_pipeline_status,
     get_deployment_history,
+    parse_duration_seconds,
+    fetch_github_workflows,
+    fetch_render_deployments,
+    get_active_alerts,
 )
 
 
@@ -109,14 +114,42 @@ def test_api_system_metrics(client):
     assert "disk_total_gb" in data["system"]
 
 
-def test_api_logs(client):
-    """Test /api/logs endpoint returns recent in-memory logs."""
+def test_api_monitoring(client):
+    """Test /api/monitoring endpoint returns consolidated metrics."""
+    response = client.get("/api/monitoring")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "system" in data
+    assert "docker" in data
+    assert "hosting" in data
+    assert "uptime_seconds" in data
+    assert data["status"] == "healthy"
+
+
+def test_api_alerts_endpoint(client):
+    """Test /api/alerts returns active alerts list."""
+    response = client.get("/api/alerts")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "alerts" in data
+    assert "count" in data
+    assert isinstance(data["alerts"], list)
+
+
+def test_api_logs(client, app):
+    """Test /api/logs endpoint returns recent in-memory logs and sanitizes secrets."""
+    app.logger.info("Normal operational log entry")
+    app.logger.warning(f"Contains secret: {app.config['SECRET_KEY']}")
+
     response = client.get("/api/logs")
     assert response.status_code == 200
     data = response.get_json()
     assert "logs" in data
     assert "count" in data
     assert isinstance(data["logs"], list)
+
+    log_messages = [entry["message"] for entry in data["logs"]]
+    assert not any(app.config["SECRET_KEY"] in m for m in log_messages)
 
 
 def test_get_uptime_seconds_helper(app):
@@ -150,12 +183,26 @@ def test_is_running_in_docker_helper():
         assert is_running_in_docker() is False
 
 
-def test_get_system_metrics_fallback():
-    """Test get_system_metrics fallback on error."""
+def test_get_system_metrics_disk_and_mem():
+    """Test get_system_metrics with mocked /proc/meminfo and disk failure."""
+    meminfo_content = (
+        "MemTotal:        16384000 kB\n"
+        "MemFree:          8192000 kB\n"
+        "MemAvailable:    12288000 kB\n"
+    )
+    with patch("os.path.exists") as mock_exists:
+        mock_exists.side_effect = lambda p: p == "/proc/meminfo"
+        with patch("builtins.open", mock_open(read_data=meminfo_content)):
+            metrics = get_system_metrics()
+            assert metrics["mem_total"] != "unavailable"
+            assert "MB" in metrics["mem_total"]
+
     with patch("shutil.disk_usage", side_effect=OSError("Disk error")):
-        metrics = get_system_metrics()
-        assert metrics["disk_total_gb"] == 0
-        assert metrics["disk_used_pct"] == 0
+        with patch("os.path.exists", return_value=False):
+            metrics = get_system_metrics()
+            assert metrics["disk_total_gb"] == 0
+            assert metrics["disk_used_pct"] == 0
+            assert metrics["mem_total"] == "unavailable"
 
 
 def test_get_aws_cloud_status_connected():
@@ -182,36 +229,156 @@ def test_get_aws_cloud_status_unconnected():
         assert "Awaiting AWS Connection" in status["status"]
 
 
-def test_get_cicd_pipeline_status_connected():
-    """Test get_cicd_pipeline_status when GitHub API returns runs."""
+def test_parse_duration_seconds():
+    """Test parse_duration_seconds helper."""
+    d = parse_duration_seconds("2026-11-12T10:00:00Z", "2026-11-12T10:01:30Z")
+    assert d == 90
+    assert parse_duration_seconds(None, None) is None
+    assert parse_duration_seconds("invalid", "invalid") is None
+
+
+def test_fetch_github_workflows_success():
+    """Test fetch_github_workflows when GitHub API returns valid runs."""
     sample_payload = {
+        "total_count": 1,
         "workflow_runs": [{
-            "id": 987654321,
-            "name": "CI Pipeline - Build & Test",
-            "conclusion": "success",
+            "id": 9999,
+            "name": "CI Pipeline",
+            "head_branch": "main",
+            "head_sha": "1234567890abcdef",
             "status": "completed",
-            "head_sha": "abc1234567890",
-            "html_url": "https://github.com/ullas-reddy-g/CloudDeploy-AWS-CICD/actions/runs/987654321",
-            "updated_at": "2026-11-08T12:00:00Z"
+            "conclusion": "success",
+            "created_at": "2026-11-12T10:00:00Z",
+            "updated_at": "2026-11-12T10:02:00Z",
+            "html_url": "https://github.com/test/run/9999",
+            "event": "push"
         }]
     }
     mock_resp = MagicMock()
     mock_resp.read.return_value = json.dumps(sample_payload).encode("utf-8")
+    mock_resp.headers = {"X-RateLimit-Remaining": "58"}
     mock_resp.__enter__.return_value = mock_resp
 
     with patch("urllib.request.urlopen", return_value=mock_resp):
-        res = get_cicd_pipeline_status("ullas-reddy-g/CloudDeploy-AWS-CICD")
+        res = fetch_github_workflows("ullas-reddy-g/CloudDeploy-AWS-CICD", token="fake-token", force_refresh=True)
+        assert res["integration_status"] == "connected"
+        assert len(res["workflow_runs"]) == 1
+        assert res["workflow_runs"][0]["duration_seconds"] == 120
+        assert res["workflow_runs"][0]["commit_sha"] == "12345678"
+
+        # Verify caching returns identical result without HTTP call
+        cached_res = fetch_github_workflows("ullas-reddy-g/CloudDeploy-AWS-CICD", force_refresh=False)
+        assert cached_res["integration_status"] == "connected"
+
+
+def test_fetch_github_workflows_errors():
+    """Test fetch_github_workflows under 403, 404, 500, and network error."""
+    # Reset cache
+    import app.routes
+    app.routes._github_cache["data"] = None
+
+    # Test 403 Rate Limit
+    err_403 = urllib.error.HTTPError("https://api.github.com", 403, "Rate Limit", {"X-RateLimit-Remaining": "0"}, None)
+    with patch("urllib.request.urlopen", side_effect=err_403):
+        res = fetch_github_workflows("ullas-reddy-g/CloudDeploy-AWS-CICD", force_refresh=True)
+        assert res["integration_status"] == "rate_limited"
+
+    # Test 404 Not Found
+    err_404 = urllib.error.HTTPError("https://api.github.com", 404, "Not Found", {}, None)
+    with patch("urllib.request.urlopen", side_effect=err_404):
+        res = fetch_github_workflows("unknown/repo", force_refresh=True)
+        assert res["integration_status"] == "not_found"
+
+    # Test 500 Internal Error
+    err_500 = urllib.error.HTTPError("https://api.github.com", 500, "Server Error", {}, None)
+    with patch("urllib.request.urlopen", side_effect=err_500):
+        res = fetch_github_workflows("unknown/repo", force_refresh=True)
+        assert res["integration_status"] == "error"
+
+    # Test URLError
+    with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Network unreachable")):
+        res = fetch_github_workflows("unknown/repo", force_refresh=True)
+        assert res["integration_status"] == "unavailable"
+
+
+def test_api_github_workflows_endpoint(client):
+    """Test /api/github/workflows endpoint."""
+    with patch("app.routes.fetch_github_workflows") as mock_fetch:
+        mock_fetch.return_value = {
+            "integration_status": "connected",
+            "workflow_runs": [],
+            "total_count": 0
+        }
+        response = client.get("/api/github/workflows?refresh=true")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["integration_status"] == "connected"
+
+
+def test_fetch_render_deployments(app):
+    """Test fetch_render_deployments with and without credentials."""
+    with app.app_context():
+        # Unconfigured
+        unconf = fetch_render_deployments("", "")
+        assert unconf["integration_status"] == "unconfigured"
+        assert unconf["provider"] == "Render (Cloud PaaS)"
+
+        # Connected
+        sample_deploys = [{
+            "deploy": {
+                "id": "dep-1234",
+                "status": "live",
+                "commit": {"id": "abcdef123456", "message": "Deploy commit"},
+                "createdAt": "2026-11-12T10:00:00Z",
+                "updatedAt": "2026-11-12T10:05:00Z",
+                "finishedAt": "2026-11-12T10:05:00Z"
+            }
+        }]
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = json.dumps(sample_deploys).encode("utf-8")
+        mock_resp.__enter__.return_value = mock_resp
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            conn = fetch_render_deployments("srv-123", "rnd_testkey")
+            assert conn["integration_status"] == "connected"
+            assert len(conn["deployments"]) == 1
+            assert conn["deployments"][0]["commit_id"] == "abcdef12"
+
+        # Error
+        with patch("urllib.request.urlopen", side_effect=OSError("Render API unreachable")):
+            err_res = fetch_render_deployments("srv-123", "rnd_testkey")
+            assert err_res["integration_status"] == "error"
+
+
+def test_api_deployments_endpoint(client):
+    """Test /api/deployments endpoint."""
+    response = client.get("/api/deployments")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "integration_status" in data
+    assert "deployments" in data
+
+
+def test_get_cicd_pipeline_status():
+    """Test get_cicd_pipeline_status using mock fetch_github_workflows."""
+    with patch("app.routes.fetch_github_workflows") as mock_fetch:
+        mock_fetch.return_value = {
+            "workflow_runs": [{
+                "name": "CI Pipeline",
+                "conclusion": "success",
+                "status": "completed",
+                "commit_sha": "abc12345",
+                "html_url": "https://github.com/test",
+                "updated_at": "2026-11-12T10:00:00Z"
+            }]
+        }
+        res = get_cicd_pipeline_status("test/repo")
         assert res["available"] is True
         assert res["conclusion"] == "success"
-        assert res["commit_sha"] == "abc12345"
 
-
-def test_get_cicd_pipeline_status_fallback():
-    """Test get_cicd_pipeline_status fallback when GitHub API fails or repository is unpublished."""
-    with patch("urllib.request.urlopen", side_effect=OSError("API rate limit / offline")):
-        res = get_cicd_pipeline_status("ullas-reddy-g/CloudDeploy-AWS-CICD")
-        assert res["available"] is False
-        assert "Awaiting GitHub" in res["status"]
+        mock_fetch.return_value = {"workflow_runs": []}
+        res_empty = get_cicd_pipeline_status("test/repo")
+        assert res_empty["available"] is False
 
 
 def test_get_deployment_history_file(app):
@@ -249,11 +416,23 @@ def test_disk_alert_rendered_in_dashboard(client):
         "disk_free_gb": 10.0,
         "disk_used_pct": 90.0,
         "cpu_count": 4,
+        "mem_total": "unavailable",
+        "mem_available": "unavailable",
+        "mem_used_pct": "unavailable",
     }
     with patch("app.routes.get_system_metrics", return_value=mock_metrics):
         response = client.get("/deployment")
         assert response.status_code == 200
         assert b"High Disk Utilization Alert" in response.data
+
+
+def test_get_active_alerts_variations(app):
+    """Test alert evaluation with CI failure."""
+    system_metrics = {"disk_used_pct": 50.0}
+    cicd_info = {"conclusion": "failure", "commit_sha": "fail1234"}
+    aws_info = {"connected": False}
+    alerts = get_active_alerts(app, system_metrics, cicd_info, aws_info)
+    assert any(a["type"] == "danger" and "CI/CD Pipeline Failure" in a["title"] for a in alerts)
 
 
 def test_recent_logs_handler_error_handling(app):
@@ -277,15 +456,54 @@ def test_create_app_env_overrides():
     env_vars = {
         "APP_VERSION": "2.5.0-override",
         "DEPLOYMENT_ID": "deploy-override-99",
+        "RENDER_GIT_COMMIT": "abcdef123456789",
+        "HOSTING_PROVIDER": "render",
+        "RENDER_SERVICE_ID": "srv-test-99",
+        "RENDER_EXTERNAL_URL": "https://test.onrender.com",
         "AWS_REGION": "eu-west-1",
         "GITHUB_REPOSITORY": "ullas-reddy-g/CloudDeploy-AWS-CICD",
     }
     with patch.dict(os.environ, env_vars):
         custom_app = create_app("testing")
         assert custom_app.config["APP_VERSION"] == "2.5.0-override"
-        assert custom_app.config["DEPLOYMENT_ID"] == "deploy-override-99"
+        assert custom_app.config["DEPLOYMENT_ID"] == "abcdef12"
+        assert custom_app.config["HOSTING_PROVIDER"] == "render"
+        assert custom_app.config["RENDER_SERVICE_ID"] == "srv-test-99"
+        assert custom_app.config["RENDER_EXTERNAL_URL"] == "https://test.onrender.com"
         assert custom_app.config["AWS_REGION"] == "eu-west-1"
         assert custom_app.config["GITHUB_REPOSITORY"] == "ullas-reddy-g/CloudDeploy-AWS-CICD"
+
+
+def test_get_system_metrics_meminfo_exception():
+    """Test get_system_metrics when opening /proc/meminfo raises an exception."""
+    with patch("os.path.exists", return_value=True):
+        with patch("builtins.open", side_effect=PermissionError("meminfo locked")):
+            metrics = get_system_metrics()
+            assert metrics["mem_total"] == "unavailable"
+
+
+def test_fetch_github_workflows_fallback_with_existing_cache():
+    """Test GitHub API fallback to cached telemetry when errors occur."""
+    import app.routes
+    app.routes._github_cache["data"] = {
+        "integration_status": "connected",
+        "workflow_runs": [{"id": 1}],
+        "repository": "test/repo"
+    }
+    app.routes._github_cache["timestamp"] = 0.0
+
+    # Test HTTP error with cache fallback
+    err = urllib.error.HTTPError("https://api.github.com", 500, "Server Error", {}, None)
+    with patch("urllib.request.urlopen", side_effect=err):
+        res = fetch_github_workflows("test/repo", force_refresh=True)
+        assert res["cached"] is True
+        assert "warning" in res
+
+    # Test generic exception with cache fallback
+    with patch("urllib.request.urlopen", side_effect=RuntimeError("Connection timeout")):
+        res = fetch_github_workflows("test/repo", force_refresh=True)
+        assert res["cached"] is True
+        assert "warning" in res
 
 
 def test_create_app_default_config():

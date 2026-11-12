@@ -9,19 +9,22 @@
         <div class="card card-hero border-0 shadow-lg p-4 p-md-5">
             <div class="row align-items-center">
                 <div class="col-lg-8">
-                    <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 mb-3 fs-sm">
-                        <i class="bi bi-patch-check-fill"></i> Continuous Integration & Automated AWS Deployment
+                    <div class="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-success bg-opacity-25 text-success border border-success border-opacity-25 mb-3 fs-sm">
+                        <i class="bi bi-patch-check-fill"></i> Continuous Integration & Automated Cloud Deployment
                     </div>
                     <h1 class="display-5 fw-bold text-white mb-3">CloudDeploy Platform</h1>
                     <p class="lead text-secondary-emphasis mb-4">
-                        Automated cloud deployment pipeline running Python Flask inside containerized Docker environments, reverse-proxied by Nginx, and orchestrated on AWS EC2 with GitHub Actions & Amazon ECR.
+                        Automated cloud deployment pipeline running Python Flask inside containerized Docker environments, reverse-proxied by Nginx, and deployed on Render Cloud with GitHub Actions CI automation and optional AWS extensions.
                     </p>
                     <div class="d-flex flex-wrap gap-2">
                         <a href="{{ url_for('main.deployment') }}" class="btn btn-primary px-4 py-2">
-                            <i class="bi bi-speedometer2 me-2"></i> Deployment Status
+                            <i class="bi bi-speedometer2 me-2"></i> Deployment Dashboard
                         </a>
                         <a href="{{ url_for('main.about') }}" class="btn btn-outline-light px-4 py-2">
                             <i class="bi bi-diagram-3 me-2"></i> Architecture Overview
+                        </a>
+                        <a href="{{ info.live_url }}" target="_blank" class="btn btn-outline-success px-4 py-2">
+                            <i class="bi bi-box-arrow-up-right me-2"></i> Live Render App
                         </a>
                         <a href="/api/info" target="_blank" class="btn btn-outline-info px-4 py-2">
                             <i class="bi bi-code-slash me-2"></i> /api/info
@@ -46,7 +49,7 @@
                     <span class="badge bg-success-subtle text-success border border-success-subtle">HEALTHY</span>
                 </div>
                 <h3 class="fw-bold text-white mb-1">{{ info.app_name }}</h3>
-                <span class="text-secondary small">Flask &bull; Gunicorn WSGI</span>
+                <span class="text-secondary small">Flask 3.0 &bull; Gunicorn WSGI</span>
             </div>
         </div>
     </div>
@@ -59,7 +62,7 @@
                     <span class="badge bg-info-subtle text-info border border-info-subtle">PROD</span>
                 </div>
                 <h3 class="fw-bold text-white mb-1">v{{ info.version }}</h3>
-                <span class="text-secondary small">Deployment ID: <code>{{ info.deployment_id }}</code></span>
+                <span class="text-secondary small">Commit: <code>{{ info.deployment_id }}</code></span>
             </div>
         </div>
     </div>
@@ -68,11 +71,11 @@
         <div class="card status-card h-100 border-secondary">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-3">
-                    <span class="text-secondary small fw-bold text-uppercase">Environment</span>
-                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle text-uppercase">{{ info.environment }}</span>
+                    <span class="text-secondary small fw-bold text-uppercase">Hosting Provider</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle text-uppercase">{{ info.hosting_provider }}</span>
                 </div>
-                <h3 class="fw-bold text-white mb-1">{{ info.aws_region }}</h3>
-                <span class="text-secondary small">Target AWS Region</span>
+                <h3 class="fw-bold text-white mb-1">Render Cloud</h3>
+                <span class="text-secondary small">Live at onrender.com</span>
             </div>
         </div>
     </div>
@@ -118,7 +121,7 @@
                         <div class="p-3 rounded bg-surface border border-secondary">
                             <i class="bi bi-shield-check text-info fs-3 mb-2 d-block"></i>
                             <div class="fw-semibold">2. Pytest CI</div>
-                            <small class="text-secondary">Unit & API Tests</small>
+                            <small class="text-secondary">Flake8 & Coverage</small>
                         </div>
                     </div>
                     <div class="col-md-1 d-none d-md-block text-secondary">
@@ -127,18 +130,18 @@
                     <div class="col-md-2">
                         <div class="p-3 rounded bg-surface border border-secondary">
                             <i class="bi bi-box-seam text-primary fs-3 mb-2 d-block"></i>
-                            <div class="fw-semibold">3. ECR Push</div>
-                            <small class="text-secondary">OIDC Docker Build</small>
+                            <div class="fw-semibold">3. Docker Build</div>
+                            <small class="text-secondary">Non-Root UID 10001</small>
                         </div>
                     </div>
                     <div class="col-md-1 d-none d-md-block text-secondary">
                         <i class="bi bi-arrow-right fs-4"></i>
                     </div>
                     <div class="col-md-3">
-                        <div class="p-3 rounded bg-surface border border-primary">
-                            <i class="bi bi-hdd-network text-success fs-3 mb-2 d-block"></i>
-                            <div class="fw-semibold text-success">4. EC2 & Nginx</div>
-                            <small class="text-secondary">Automated Rollout</small>
+                        <div class="p-3 rounded bg-surface border border-success">
+                            <i class="bi bi-cloud-check text-success fs-3 mb-2 d-block"></i>
+                            <div class="fw-semibold text-success">4. Render Deployment</div>
+                            <small class="text-secondary">Automated Web App Rollout</small>
                         </div>
                     </div>
                 </div>

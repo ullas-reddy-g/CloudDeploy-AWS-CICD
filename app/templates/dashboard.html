@@ -4,23 +4,28 @@
 
 {% block content %}
 <div class="row g-4">
-    <!-- Header with Quick Action Buttons -->
+    <!-- Header with Live Actions -->
     <div class="col-12">
         <div class="d-flex flex-wrap justify-content-between align-items-center pb-3 border-bottom border-secondary">
             <div>
                 <div class="d-flex align-items-center gap-2 mb-1">
                     <h2 class="fw-bold text-white mb-0">Cloud Deployment & Monitoring Dashboard</h2>
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Live Telemetry</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">Live Telemetry</span>
                 </div>
-                <p class="text-secondary mb-0">Comprehensive runtime metrics, container diagnostics, and AWS cloud topology monitoring.</p>
+                <p class="text-secondary mb-0">
+                    Live production telemetry, GitHub Actions CI/CD metrics, Docker diagnostics, and Render hosting status.
+                </p>
             </div>
-            <div class="d-flex gap-2 mt-3 mt-md-0">
+            <div class="d-flex flex-wrap gap-2 mt-3 mt-md-0">
                 <button id="refreshHealthBtn" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-arrow-clockwise me-1"></i> Probe Health
                 </button>
                 <button id="refreshLogsBtn" class="btn btn-outline-info btn-sm">
                     <i class="bi bi-terminal me-1"></i> Refresh Logs
                 </button>
+                <a href="{{ info.live_url }}" target="_blank" class="btn btn-outline-success btn-sm">
+                    <i class="bi bi-box-arrow-up-right me-1"></i> Open Live Render App
+                </a>
                 <a href="https://github.com/{{ info.github_repo }}/actions" target="_blank" class="btn btn-outline-secondary btn-sm">
                     <i class="bi bi-github me-1"></i> GitHub Actions
                 </a>
@@ -30,12 +35,16 @@
 
     <!-- Section G: Alerts & Notifications -->
     <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="text-white fw-bold mb-0"><i class="bi bi-bell-fill text-warning me-1"></i> Section G: Real-Time System Alerts</h6>
+            <span class="badge bg-secondary small">{{ info.alerts|length }} Active</span>
+        </div>
         {% if info.alerts %}
             <div class="d-flex flex-column gap-2">
                 {% for alert in info.alerts %}
                 <div class="alert alert-{{ alert.type }} bg-{{ alert.type }}-subtle border-{{ alert.type }}-subtle text-{{ alert.type }}-emphasis d-flex align-items-center justify-content-between mb-0 py-2 px-3 small rounded-3" role="alert">
                     <div class="d-flex align-items-center gap-2">
-                        <i class="bi {% if alert.type == 'warning' %}bi-exclamation-triangle-fill{% elif alert.type == 'info' %}bi-info-circle-fill{% else %}bi-shield-shaded{% endif %}"></i>
+                        <i class="bi {% if alert.type == 'danger' %}bi-x-circle-fill{% elif alert.type == 'warning' %}bi-exclamation-triangle-fill{% elif alert.type == 'info' %}bi-info-circle-fill{% else %}bi-shield-shaded{% endif %}"></i>
                         <strong>{{ alert.title }}:</strong> {{ alert.message }}
                     </div>
                     <span class="badge bg-{{ alert.type }} text-white text-uppercase" style="font-size: 0.7rem;">Active</span>
@@ -50,12 +59,12 @@
         {% endif %}
     </div>
 
-    <!-- Section A: Overview Cards -->
+    <!-- Section A: Overview KPI Cards -->
     <div class="col-md-6 col-xl-3">
         <div class="card status-card h-100 border-secondary">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="text-secondary small fw-bold text-uppercase">Service Health</span>
+                    <span class="text-secondary small fw-bold text-uppercase">Section A: Service Health</span>
                     <span id="overviewHealthBadge" class="badge bg-success-subtle text-success border border-success-subtle">OPERATIONAL</span>
                 </div>
                 <h4 class="fw-bold text-white mb-1">{{ info.app_name }}</h4>
@@ -68,11 +77,24 @@
         <div class="card status-card h-100 border-secondary">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="text-secondary small fw-bold text-uppercase">Release Version</span>
+                    <span class="text-secondary small fw-bold text-uppercase">Hosting Provider</span>
+                    <span class="badge bg-info-subtle text-info border border-info-subtle text-uppercase">{{ info.hosting_provider }}</span>
+                </div>
+                <h4 class="fw-bold text-white mb-1">Render Cloud</h4>
+                <div class="text-secondary small"><a href="{{ info.live_url }}" target="_blank" class="text-decoration-none text-info">Live Production <i class="bi bi-arrow-up-right"></i></a></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+        <div class="card status-card h-100 border-secondary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="text-secondary small fw-bold text-uppercase">Version & Commit</span>
                     <span class="badge bg-primary-subtle text-primary border border-primary-subtle">v{{ info.version }}</span>
                 </div>
-                <h4 class="fw-bold text-white mb-1"><code>{{ info.deployment_id }}</code></h4>
-                <div class="text-secondary small">Deployment Tag</div>
+                <h4 class="fw-bold text-white mb-1 font-monospace">{{ info.deployment_id }}</h4>
+                <div class="text-secondary small">Active Deployment Tag</div>
             </div>
         </div>
     </div>
@@ -81,33 +103,20 @@
         <div class="card status-card h-100 border-secondary">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="text-secondary small fw-bold text-uppercase">Environment</span>
-                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle text-uppercase">{{ info.environment }}</span>
-                </div>
-                <h4 class="fw-bold text-white mb-1">{{ info.aws_region }}</h4>
-                <div class="text-secondary small">Target AWS Region</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-6 col-xl-3">
-        <div class="card status-card h-100 border-secondary">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="text-secondary small fw-bold text-uppercase">Runtime Mode</span>
+                    <span class="text-secondary small fw-bold text-uppercase">Environment & Mode</span>
                     {% if info.is_container %}
                     <span class="badge bg-success-subtle text-success border border-success-subtle">DOCKER</span>
                     {% else %}
                     <span class="badge bg-secondary-subtle text-light border border-secondary">HOST PYTHON</span>
                     {% endif %}
                 </div>
-                <h4 class="fw-bold text-white mb-1">{{ info.hostname }}</h4>
-                <div class="text-secondary small">Node Hostname</div>
+                <h4 class="fw-bold text-white mb-1 text-uppercase">{{ info.environment }}</h4>
+                <div class="text-secondary small">{{ info.hostname }}</div>
             </div>
         </div>
     </div>
 
-    <!-- Section B & C: Docker & AWS Cloud Monitoring Row -->
+    <!-- Section B: Docker Container Monitoring & Section C: Cloud Infrastructure Row -->
     <div class="col-lg-6">
         <div class="card border-secondary h-100">
             <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
@@ -149,6 +158,16 @@
                             <td class="text-secondary py-2">Reverse Proxy Link</td>
                             <td class="text-end text-light">Nginx Reverse Proxy &bull; Port 80 &rarr; 8000</td>
                         </tr>
+                        <tr>
+                            <td class="text-secondary py-2">Memory Allocation</td>
+                            <td class="text-end font-monospace text-light">
+                                {% if info.system_metrics.mem_total != 'unavailable' %}
+                                {{ info.system_metrics.mem_total }} ({{ info.system_metrics.mem_used_pct }} used)
+                                {% else %}
+                                <span class="text-secondary">Unavailable on host</span>
+                                {% endif %}
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -159,22 +178,28 @@
         <div class="card border-secondary h-100">
             <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
-                    <i class="bi bi-cloud-check-fill text-warning"></i> Section C: AWS Cloud Infrastructure
+                    <i class="bi bi-cloud-check-fill text-warning"></i> Section C: AWS Cloud Infrastructure & Render Cloud
                 </h5>
-                <span class="badge {% if info.aws_cloud.connected %}bg-success{% else %}bg-secondary{% endif %}">
-                    {{ info.aws_cloud.status }}
-                </span>
+                <span class="badge bg-info">Render Connected</span>
             </div>
             <div class="card-body">
                 <table class="table table-dark table-sm mb-3">
                     <tbody>
                         <tr>
+                            <td class="text-secondary py-2">Active Production Host</td>
+                            <td class="text-end text-light"><span class="badge bg-success-subtle text-success">Render Free Tier (Live)</span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-secondary py-2">Production URL</td>
+                            <td class="text-end text-light"><a href="{{ info.live_url }}" target="_blank" class="text-info text-decoration-none font-monospace">{{ info.live_url }}</a></td>
+                        </tr>
+                        <tr>
                             <td class="text-secondary py-2">EC2 Instance ID</td>
                             <td class="text-end font-monospace text-light">{{ info.aws_cloud.instance_id }}</td>
                         </tr>
                         <tr>
-                            <td class="text-secondary py-2">AWS Region</td>
-                            <td class="text-end text-light">{{ info.aws_region }}</td>
+                            <td class="text-secondary py-2">Target AWS Region</td>
+                            <td class="text-end text-light">{{ info.aws_region }} (Architecture Reference)</td>
                         </tr>
                         <tr>
                             <td class="text-secondary py-2">CloudWatch Agent</td>
@@ -188,7 +213,7 @@
                 </table>
                 <div>
                     <div class="d-flex justify-content-between small text-secondary mb-1">
-                        <span>Host Storage Utilization: {{ info.system_metrics.disk_used_gb }} GB / {{ info.system_metrics.disk_total_gb }} GB</span>
+                        <span>Host Storage: {{ info.system_metrics.disk_used_gb }} GB / {{ info.system_metrics.disk_total_gb }} GB</span>
                         <span>{{ info.system_metrics.disk_used_pct }}%</span>
                     </div>
                     <div class="progress" style="height: 6px;">
@@ -199,50 +224,83 @@
         </div>
     </div>
 
-    <!-- Section D: CI/CD Pipeline Status -->
+    <!-- Section D: CI/CD Automation Pipeline (Real GitHub Actions API) -->
     <div class="col-12">
         <div class="card border-secondary">
-            <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
-                    <i class="bi bi-arrow-repeat text-primary"></i> Section D: CI/CD Automation Pipeline
-                </h5>
-                <a href="{{ info.cicd.html_url }}" target="_blank" class="btn btn-sm btn-outline-primary">
-                    <i class="bi bi-box-arrow-up-right me-1"></i> Repository Actions
-                </a>
-            </div>
-            <div class="card-body p-4">
-                <div class="row g-3 align-items-center text-center">
-                    <div class="col-md-3">
-                        <div class="p-3 rounded bg-surface border border-secondary">
-                            <i class="bi bi-github fs-3 text-white mb-2 d-block"></i>
-                            <div class="fw-semibold text-white">Repository</div>
-                            <small class="text-secondary font-monospace">{{ info.github_repo }}</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="p-3 rounded bg-surface border border-secondary">
-                            <i class="bi bi-shield-check fs-3 text-info mb-2 d-block"></i>
-                            <div class="fw-semibold text-white">CI Pipeline Status</div>
-                            <span class="badge {% if info.cicd.conclusion == 'success' %}bg-success{% elif info.cicd.conclusion == 'pending_publication' %}bg-secondary{% else %}bg-warning{% endif %}">
-                                {{ info.cicd.conclusion }}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="p-3 rounded bg-surface border border-secondary">
-                            <i class="bi bi-tag fs-3 text-primary mb-2 d-block"></i>
-                            <div class="fw-semibold text-white">Commit SHA</div>
-                            <small class="text-secondary font-monospace">{{ info.cicd.commit_sha }}</small>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="p-3 rounded bg-surface border border-secondary">
-                            <i class="bi bi-clock-history fs-3 text-warning mb-2 d-block"></i>
-                            <div class="fw-semibold text-white">Pipeline Execution</div>
-                            <small class="text-secondary">{{ info.cicd.status }}</small>
-                        </div>
-                    </div>
+            <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
+                        <i class="bi bi-arrow-repeat text-primary"></i> Section D: CI/CD Automation Pipeline (GitHub Actions Telemetry)
+                    </h5>
+                    <span class="badge {% if info.github_telemetry.integration_status == 'connected' %}bg-success{% elif info.github_telemetry.integration_status == 'rate_limited' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                        {{ info.github_telemetry.integration_status|upper }}
+                    </span>
                 </div>
+                <div class="d-flex gap-2">
+                    <a href="https://github.com/{{ info.github_repo }}/actions" target="_blank" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-box-arrow-up-right me-1"></i> Repository Actions
+                    </a>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if info.github_telemetry.workflow_runs %}
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 small">
+                        <thead>
+                            <tr class="text-secondary border-bottom border-secondary">
+                                <th class="ps-3">Workflow</th>
+                                <th>Branch</th>
+                                <th>Commit SHA</th>
+                                <th>Status</th>
+                                <th>Conclusion</th>
+                                <th>Duration</th>
+                                <th>Started</th>
+                                <th class="text-end pe-3">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for run in info.github_telemetry.workflow_runs %}
+                            <tr>
+                                <td class="ps-3 fw-semibold text-white">
+                                    <i class="bi bi-gear-wide-connected text-primary me-1"></i> {{ run.name }}
+                                </td>
+                                <td><span class="badge bg-secondary font-monospace">{{ run.branch }}</span></td>
+                                <td><code class="text-info">{{ run.commit_sha }}</code></td>
+                                <td class="text-uppercase">{{ run.status }}</td>
+                                <td>
+                                    <span class="badge {% if run.conclusion == 'success' %}bg-success{% elif run.conclusion == 'failure' %}bg-danger{% elif run.conclusion == 'in_progress' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                        {{ run.conclusion }}
+                                    </span>
+                                </td>
+                                <td class="text-light">
+                                    {% if run.duration_seconds is not none %}
+                                    {{ run.duration_seconds }}s
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                                <td class="text-secondary">{{ run.created_at[:19].replace('T', ' ') if run.created_at else '-' }}</td>
+                                <td class="text-end pe-3">
+                                    <a href="{{ run.html_url }}" target="_blank" class="btn btn-xs btn-outline-info py-0 px-2" style="font-size: 0.75rem;">
+                                        View Run <i class="bi bi-arrow-up-right"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-secondary">
+                    <i class="bi bi-info-circle fs-3 d-block mb-2"></i>
+                    <p class="mb-1">{{ info.github_telemetry.message or 'No workflow run data currently available from GitHub API.' }}</p>
+                    <small>Visit <a href="https://github.com/{{ info.github_repo }}/actions" target="_blank" class="text-info">GitHub Actions Console</a> directly.</small>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-surface border-top border-secondary py-2 px-3 d-flex justify-content-between align-items-center text-secondary small">
+                <span>Repository: <strong class="text-light">{{ info.github_repo }}</strong></span>
+                <span>Rate Limit Remaining: <strong class="text-light">{{ info.github_telemetry.rate_limit_remaining or 'N/A' }}</strong></span>
             </div>
         </div>
     </div>
@@ -250,10 +308,11 @@
     <!-- Section E: Deployment History -->
     <div class="col-lg-6">
         <div class="card border-secondary h-100">
-            <div class="card-header bg-surface border-bottom border-secondary py-3">
+            <div class="card-header bg-surface border-bottom border-secondary py-3 d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
                     <i class="bi bi-journal-text text-success"></i> Section E: Deployment History
                 </h5>
+                <span class="badge bg-success-subtle text-success">Render Continuous Delivery</span>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -275,7 +334,7 @@
                                 <td class="text-secondary">{{ record.timestamp }}</td>
                                 <td class="text-uppercase">{{ record.environment }}</td>
                                 <td class="text-end pe-3">
-                                    <span class="badge {% if record.status == 'SUCCESS' %}bg-success{% else %}bg-danger{% endif %}">
+                                    <span class="badge {% if record.status == 'SUCCESS' or record.status == 'LIVE' %}bg-success{% else %}bg-danger{% endif %}">
                                         {{ record.status }}
                                     </span>
                                 </td>
@@ -301,6 +360,56 @@
                 <pre class="bg-black text-light p-3 mb-0 small overflow-auto font-monospace" style="max-height: 260px; min-height: 200px;" id="applicationLogStream">
 Loading recent application log stream...
                 </pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section H: Architecture Diagram & Deployment Topology Flow -->
+    <div class="col-12">
+        <div class="card border-secondary">
+            <div class="card-header bg-surface border-bottom border-secondary py-3">
+                <h5 class="card-title mb-0 text-white d-flex align-items-center gap-2">
+                    <i class="bi bi-diagram-3-fill text-warning"></i> Section H: Architecture & Deployment Topology Flow
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="row g-3 text-center align-items-center">
+                    <div class="col-md-2 col-6">
+                        <div class="p-3 bg-surface rounded border border-secondary">
+                            <i class="bi bi-laptop fs-2 text-primary d-block mb-1"></i>
+                            <strong class="text-white small">Developer</strong>
+                            <div class="text-secondary" style="font-size: 0.75rem;">Git Commit / PR</div>
+                        </div>
+                    </div>
+                    <div class="col-md-1 d-none d-md-block text-secondary fs-4">&rarr;</div>
+                    <div class="col-md-2 col-6">
+                        <div class="p-3 bg-surface rounded border border-secondary">
+                            <i class="bi bi-github fs-2 text-light d-block mb-1"></i>
+                            <strong class="text-white small">GitHub</strong>
+                            <div class="text-secondary" style="font-size: 0.75rem;">Branch <code>main</code></div>
+                        </div>
+                    </div>
+                    <div class="col-md-1 d-none d-md-block text-secondary fs-4">&rarr;</div>
+                    <div class="col-md-2 col-6">
+                        <div class="p-3 bg-surface rounded border border-secondary">
+                            <i class="bi bi-gear-fill fs-2 text-info d-block mb-1"></i>
+                            <strong class="text-white small">GitHub Actions</strong>
+                            <div class="text-secondary" style="font-size: 0.75rem;">Flake8 + Pytest + Docker</div>
+                        </div>
+                    </div>
+                    <div class="col-md-1 d-none d-md-block text-secondary fs-4">&rarr;</div>
+                    <div class="col-md-3 col-6">
+                        <div class="p-3 bg-surface rounded border border-success">
+                            <i class="bi bi-cloud-check fs-2 text-success d-block mb-1"></i>
+                            <strong class="text-white small">Render Cloud (Live)</strong>
+                            <div class="text-success" style="font-size: 0.75rem;">Automated Docker Deployment</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 p-3 bg-black rounded border border-secondary small text-secondary">
+                    <strong class="text-white"><i class="bi bi-info-circle me-1"></i> Enterprise Extension Note:</strong>
+                    The codebase also includes production AWS infrastructure artifacts (ECR provisioning, EC2 user-data bootstrap, IAM OIDC policies, and CloudWatch agent configs) in <code>deployment/aws/</code> for optional enterprise deployment.
+                </div>
             </div>
         </div>
     </div>

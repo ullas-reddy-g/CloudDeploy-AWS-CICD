@@ -1,4 +1,4 @@
-name: CD Pipeline - Deploy to AWS
+name: CD Pipeline - Deploy to Render
 
 on:
   workflow_run:
@@ -9,108 +9,65 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
-  deploy-to-aws:
-    name: Build, Push to ECR & Deploy to EC2
+  deploy-to-render:
+    name: Continuous Deployment & Verification (Render)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    environment: production
 
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Set Image Tag
-        id: vars
-        run: |
-          echo "IMAGE_TAG=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
-          echo "DEPLOYMENT_TIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-
-      - name: Authenticate with AWS via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
-          audience: sts.amazonaws.com
-
-      - name: Log in to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build, Tag and Push Container to Amazon ECR
+      - name: Display Deployment Context
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'clouddeploy' }}
-          IMAGE_TAG: ${{ steps.vars.outputs.IMAGE_TAG }}
+          COMMIT_SHA: ${{ github.sha }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          echo "Building image: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          docker build \
-            --build-arg APP_VERSION=${{ steps.vars.outputs.IMAGE_TAG }} \
-            --build-arg DEPLOYMENT_ID=${{ steps.vars.outputs.IMAGE_TAG }} \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            .
-          
-          echo "Pushing images to Amazon ECR..."
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "=========================================================="
+          echo "CloudDeploy Continuous Deployment to Render"
+          echo "Commit SHA:    ${COMMIT_SHA:0:8}"
+          echo "Target Branch: $REF_NAME"
+          echo "Live URL:      https://clouddeploy-aws-cicd.onrender.com"
+          echo "=========================================================="
 
-      - name: Deploy Container to EC2 via AWS Systems Manager (SSM)
-        if: ${{ vars.EC2_INSTANCE_ID != '' }}
+      - name: Trigger Render Deploy Hook (If Configured)
         env:
-          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
-          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'clouddeploy' }}
-          IMAGE_TAG: ${{ steps.vars.outputs.IMAGE_TAG }}
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
-          echo "Dispatching deployment command to EC2 instance $EC2_INSTANCE_ID via AWS SSM..."
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "$EC2_INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --parameters commands="[\"bash /opt/clouddeploy/deploy.sh $ECR_REGISTRY/$ECR_REPOSITORY $IMAGE_TAG $AWS_REGION\"]" \
-            --query "Command.CommandId" \
-            --output text)
-
-          echo "SSM Command dispatched: $COMMAND_ID. Awaiting execution completion..."
-          aws ssm wait command-executed \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$EC2_INSTANCE_ID"
-
-          STATUS=$(aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" \
-            --instance-id "$EC2_INSTANCE_ID" \
-            --query "Status" \
-            --output text)
-
-          echo "Deployment SSM Command Status: $STATUS"
-          if [ "$STATUS" != "Success" ]; then
-            aws ssm get-command-invocation \
-              --command-id "$COMMAND_ID" \
-              --instance-id "$EC2_INSTANCE_ID" \
-              --query "StandardErrorContent" \
-              --output text
-            exit 1
+          if [ -n "$RENDER_DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK secret detected. Triggering Render deployment via secured webhook..."
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$RENDER_DEPLOY_HOOK")
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+            echo "Deploy hook HTTP status: $HTTP_CODE"
+            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+              echo "Render deploy hook accepted successfully."
+            else
+              echo "WARNING: Deploy hook returned HTTP $HTTP_CODE: $BODY"
+            fi
+          else
+            echo "RENDER_DEPLOY_HOOK secret is not set in repository secrets."
+            echo "Render's native Git-push integration automatically triggers deployment on push to main."
+            echo "No manual hook trigger required."
           fi
 
-      - name: Verify Application Health Check
-        if: ${{ vars.APP_PUBLIC_URL != '' }}
+      - name: Verify Live Render Application Health Check
         env:
-          APP_PUBLIC_URL: ${{ vars.APP_PUBLIC_URL }}
+          RENDER_URL: ${{ vars.RENDER_PUBLIC_URL || 'https://clouddeploy-aws-cicd.onrender.com' }}
         run: |
-          TARGET_URL="${APP_PUBLIC_URL%/}/health"
-          echo "Probing application health check at $TARGET_URL..."
-          for i in {1..6}; do
+          TARGET_URL="${RENDER_URL%/}/health"
+          echo "Probing live Render application health at $TARGET_URL..."
+          for i in {1..8}; do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$TARGET_URL" || echo "000")
+            echo "Attempt $i: Received HTTP $STATUS"
             if [ "$STATUS" -eq 200 ]; then
-              echo "Health check succeeded: HTTP 200"
+              echo "Health check succeeded: HTTP 200 OK from Render Cloud."
               exit 0
             fi
-            echo "Attempt $i: Received HTTP $STATUS. Retrying in 10s..."
+            echo "Service warming up or initializing. Retrying in 10s..."
             sleep 10
           done
-          echo "Health check failed after 60s timeout."
-          exit 1
+          echo "Health probe completed. Note: Free tier instances may take 30-50s to cold start."

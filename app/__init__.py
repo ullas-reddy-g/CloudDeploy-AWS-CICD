@@ -62,6 +62,14 @@ def create_app(config_name=None):
         app.config["APP_VERSION"] = os.getenv("APP_VERSION")
     if os.getenv("DEPLOYMENT_ID"):
         app.config["DEPLOYMENT_ID"] = os.getenv("DEPLOYMENT_ID")
+    if os.getenv("RENDER_GIT_COMMIT"):
+        app.config["DEPLOYMENT_ID"] = os.getenv("RENDER_GIT_COMMIT")[:8]
+    if os.getenv("HOSTING_PROVIDER"):
+        app.config["HOSTING_PROVIDER"] = os.getenv("HOSTING_PROVIDER")
+    if os.getenv("RENDER_SERVICE_ID"):
+        app.config["RENDER_SERVICE_ID"] = os.getenv("RENDER_SERVICE_ID")
+    if os.getenv("RENDER_EXTERNAL_URL"):
+        app.config["RENDER_EXTERNAL_URL"] = os.getenv("RENDER_EXTERNAL_URL")
     if os.getenv("AWS_REGION"):
         app.config["AWS_REGION"] = os.getenv("AWS_REGION")
     if os.getenv("GITHUB_REPOSITORY"):

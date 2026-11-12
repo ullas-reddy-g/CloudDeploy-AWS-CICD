@@ -1,376 +1,394 @@
-# CloudDeploy: Automated Cloud Deployment of a Containerized Web Application Using AWS and CI/CD
+# CloudDeploy: Automated Cloud Deployment of a Containerized Web Application Using Docker, Render & CI/CD
 
-[![CI Pipeline](https://img.shields.io/badge/CI%20Pipeline-Passing-2ea043?style=for-the-badge&logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
-[![CD Pipeline](https://img.shields.io/badge/CD%20Pipeline-AWS%20OIDC-2f81f7?style=for-the-badge&logo=amazonwebservices&logoColor=white)](.github/workflows/cd.yml)
+[![CI Pipeline](https://img.shields.io/badge/CI%20Pipeline-Passing-2ea043?style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/ullas-reddy-g/CloudDeploy-AWS-CICD/actions)
+[![CD Pipeline](https://img.shields.io/badge/CD%20Pipeline-Render%20Cloud-46E3B7?style=for-the-badge&logo=render&logoColor=white)](.github/workflows/cd.yml)
+[![Live Application](https://img.shields.io/badge/Production%20Live-Render%20Cloud-success?style=for-the-badge&logo=render&logoColor=white)](https://clouddeploy-aws-cicd.onrender.com)
 [![Python Version](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python&logoColor=white)](requirements.txt)
-[![Docker](https://img.shields.io/badge/Docker-Containerized-2496ed?style=for-the-badge&logo=docker&logoColor=white)](Dockerfile)
+[![Docker](https://img.shields.io/badge/Docker-Containerized%20(UID%2010001)-2496ed?style=for-the-badge&logo=docker&logoColor=white)](Dockerfile)
+[![Coverage](https://img.shields.io/badge/Coverage-100%25-brightgreen?style=for-the-badge&logo=pytest&logoColor=white)](docs/TESTING.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
 ---
 
 ## 1. Project Overview
 
-**CloudDeploy** is a production-grade cloud engineering and DevOps project demonstrating automated containerization, continuous integration, continuous deployment, and telemetry on Amazon Web Services (AWS).
+**CloudDeploy** is a production-grade cloud engineering and DevOps project demonstrating automated containerization, continuous integration, continuous delivery, and real-time observability.
 
-The application is built with **Python 3.11**, **Flask**, and **Gunicorn**, reverse-proxied by **Nginx**, and deployed inside an unprivileged Docker container. The complete deployment lifecycle—from Git commit to production rollout—is orchestrated using **GitHub Actions**, authenticated securely to AWS via **OpenID Connect (OIDC)**, and hosted on an **AWS EC2** instance backed by **Amazon Elastic Container Registry (ECR)** and **Amazon CloudWatch**.
+The application is built with **Python 3.11**, **Flask**, and **Gunicorn**, containerized with **Docker**, reverse-proxied by **Nginx**, and deployed live on **Render Cloud**. The complete lifecycle—from Git commit to production health verification—is orchestrated via **GitHub Actions** and Render automated deployment. Production-grade **AWS infrastructure artifacts** (ECR, EC2 user-data, IAM OIDC policies, CloudWatch agent) are also provided as an optional enterprise extension.
+
+- **Live Production Application:** [https://clouddeploy-aws-cicd.onrender.com](https://clouddeploy-aws-cicd.onrender.com)
+- **Monitoring & Telemetry Dashboard:** [https://clouddeploy-aws-cicd.onrender.com/deployment](https://clouddeploy-aws-cicd.onrender.com/deployment)
+- **GitHub Repository:** [https://github.com/ullas-reddy-g/CloudDeploy-AWS-CICD](https://github.com/ullas-reddy-g/CloudDeploy-AWS-CICD)
 
 ---
 
 ## 2. Problem Statement
 
-Modern software engineering teams require automated, reliable, and secure release mechanisms. Manual deployments to cloud servers lead to configuration drift, human error, extended downtime, and severe security liabilities (such as hardcoded long-lived AWS root or IAM user keys committed to source code repositories). 
+Modern software engineering teams face critical risks when deploying applications manually:
+- **Configuration Drift & Downtime:** Inconsistent server setups and manual updates lead to runtime discrepancies and deployment failures.
+- **Credential Liabilities:** Storing long-lived cloud access keys or secrets in codebases creates severe security vulnerabilities.
+- **Opaque Deployments & False Metrics:** Engineering dashboards often present fabricated or hardcoded telemetry rather than querying real upstream build APIs and runtime health probes.
 
-CloudDeploy addresses these challenges by implementing an automated CI/CD pipeline with zero long-lived credentials, immutable container versioning, automated health check validation, and self-healing rollback capabilities.
+CloudDeploy solves these challenges through an end-to-end automated pipeline with zero hardcoded credentials, 100% test coverage enforcement, hardened non-root containerization, automated deployment triggers, and honest telemetry linked directly to the GitHub Actions REST API.
 
 ---
 
 ## 3. Key Objectives
 
-1. **Production-Ready Application**: Develop a modular, responsive web dashboard with comprehensive telemetry (`/health`, `/api/info`, `/deployment`).
-2. **Hardened Containerization**: Build a lightweight Docker image executing under an unprivileged non-root user (UID 10001) with built-in health probes.
-3. **Automated Continuous Integration**: Validate code quality, enforce PEP 8 standards with `flake8`, and execute unit/integration test suites with `pytest` (>=80% coverage).
-4. **Credential-Free Continuous Deployment**: Federate GitHub Actions with AWS using **OpenID Connect (OIDC)**, completely removing static access keys.
-5. **Robust Rollout & Self-Healing Rollback**: Automate image pulls from Amazon ECR to AWS EC2, conduct post-deployment health verification, and revert to previous stable releases automatically if health checks fail.
-6. **Cloud Observability**: Stream container and reverse proxy access logs to Amazon CloudWatch and configure operational alarms.
+1. **Production-Ready Application:** Modular Flask web application with responsive Bootstrap 5 UI, health check probes (`/health`), non-sensitive metadata (`/api/info`), and consolidated telemetry (`/deployment`).
+2. **Hardened Containerization:** Lightweight Docker image based on `python:3.11-slim`, executing strictly under an unprivileged user (`clouddeploy` UID 10001) with internal Python health probes.
+3. **Automated Continuous Integration (CI):** GitHub Actions workflow executing Flake8 style enforcement (0 violations), Pytest test suite with **100% statement coverage (359/359 statements)**, Docker build verification, non-root user verification, and Docker Compose reverse proxy validation.
+4. **Automated Continuous Deployment (CD):** Continuous delivery to Render Cloud via native Git-push integration and secured deploy hooks with post-rollout health check validation.
+5. **Real Upstream Telemetry:** Live dashboard querying the official GitHub Actions REST API for recent workflow runs, durations, and conclusions, alongside real-time sanitized log streaming.
+6. **Enterprise Architecture Extension:** Complete AWS infrastructure automation code (IAM OIDC, Amazon ECR, EC2 user-data bootstrap, CloudWatch agent configuration) for enterprise cloud deployment demonstration.
 
 ---
 
 ## 4. Technology Stack
 
-| Domain | Technologies |
-|---|---|
-| **Backend & WSGI** | Python 3.11, Flask 3.0, Gunicorn 22.0, Werkzeug 3.0 |
-| **Frontend** | HTML5, CSS3, JavaScript (ES6+), Bootstrap 5.3, Bootstrap Icons |
-| **Containerization & Edge** | Docker, Docker Compose, Nginx Reverse Proxy |
-| **Cloud Infrastructure** | AWS EC2 (Ubuntu 24.04 LTS), Amazon ECR, AWS IAM, AWS Systems Manager (SSM) |
-| **CI / CD Automation** | Git, GitHub Actions, AWS OIDC Identity Federation |
-| **Automated Testing** | Pytest, Pytest-Cov, Flake8 |
-| **Cloud Monitoring** | Amazon CloudWatch Logs & Metrics, CloudWatch Agent |
+| Domain | Technologies | Purpose |
+|---|---|---|
+| **Backend & WSGI** | Python 3.11, Flask 3.0.3, Gunicorn 22.0.0, Werkzeug 3.0.3 | Application factory pattern, REST APIs, WSGI process management |
+| **Frontend UI** | HTML5, CSS3, JavaScript (ES6+), Bootstrap 5.3, Bootstrap Icons | Responsive monitoring dashboard, AJAX polling, live log streaming |
+| **Containerization** | Docker Engine, Dockerfile (UID 10001), Docker Compose v2 | Multi-stage caching, unprivileged execution, container orchestration |
+| **Edge Reverse Proxy** | Nginx Alpine | Port 80 ingress, security headers, request buffering, CloudWatch JSON logs |
+| **CI Automation** | GitHub Actions (`ci.yml`) | Flake8 linting, Pytest 100% coverage, Docker Buildx, Compose runtime test |
+| **CD Automation** | GitHub Actions (`cd.yml`) & Render | Automated deployment triggers and health check verification |
+| **Production Hosting** | Render Cloud (Free Tier) | Public HTTPS web service at `https://clouddeploy-aws-cicd.onrender.com` |
+| **Automated Testing** | Pytest 8.2.2, pytest-cov 5.0.0, Flake8 7.1.0 | 37 automated tests, 100% statement coverage, 0 Flake8 errors |
+| **Enterprise Extension** | AWS (ECR, EC2, IAM OIDC, SSM, CloudWatch) | Optional enterprise cloud infrastructure artifacts in `deployment/aws/` |
 
 ---
 
-## 5. System Architecture
+## 5. System Architecture Diagram
 
 ```mermaid
 flowchart TD
-    subgraph Developer_Workstation["Developer Station"]
-        Dev["Developer writes code"]
-        Git["Local Git Commit"]
+    subgraph Dev_Environment["Developer Workstation"]
+        Code["Flask App Code"]
+        Git["Git Commit / PR"]
     end
 
-    subgraph GitHub_Platform["GitHub Platform"]
-        Repo["GitHub Repo (main branch)"]
-        subgraph CI["GitHub Actions (CI)"]
-            Lint["flake8 Linting"]
-            Test["pytest Test Suite"]
-            DockerBuild["Docker Build Check"]
+    subgraph GitHub_Ecosystem["GitHub Platform"]
+        GHPush["GitHub Repo (main branch)"]
+        subgraph CI_Pipeline["GitHub Actions CI (ci.yml)"]
+            Lint["Flake8 Code Lint (0 errors)"]
+            Pytest["Pytest Suite (100% Coverage)"]
+            DockerTest["Docker Buildx & Runtime Check (UID 10001)"]
+            ComposeTest["Docker Compose & Nginx Proxy Probe"]
         end
-        subgraph CD["GitHub Actions (CD)"]
-            OIDC["AWS OIDC AssumeRole"]
-            ECRPush["Push Image to Amazon ECR"]
-            SSM["AWS SSM Deploy Command"]
+        subgraph CD_Pipeline["GitHub Actions CD (cd.yml)"]
+            DeployTrigger["Trigger Render Deploy (Webhook / Git Push)"]
+            HealthProbe["Probe Live Health Endpoint (HTTP 200)"]
         end
     end
 
-    subgraph AWS_Cloud["Amazon Web Services (AWS)"]
-        IAM_OIDC["IAM OIDC Identity Provider"]
-        ECR["Amazon ECR Repository"]
-        subgraph EC2["AWS EC2 Host (Ubuntu LTS)"]
-            SSM_Agent["AWS SSM Agent"]
-            Nginx["Nginx Reverse Proxy (Port 80)"]
-            Docker["Docker Runtime"]
-            App["CloudDeploy Flask/Gunicorn (Port 8000)"]
-            DeployScript["Rollout / Rollback Handler"]
-        end
-        CloudWatch["Amazon CloudWatch Logs & Alarms"]
+    subgraph Render_Cloud_Tier["Render Cloud (Active Production)"]
+        RenderService["Dockerized Web Service (Render Free Tier)"]
+        GunicornWSGI["Gunicorn WSGI Server (Port 8000)"]
+        LiveApp["Public HTTPS: clouddeploy-aws-cicd.onrender.com"]
     end
 
-    Dev --> Git
-    Git --> Repo
-    Repo --> CI
-    CI --> CD
-    CD --> OIDC
-    OIDC --> IAM_OIDC
-    CD --> ECRPush
-    ECRPush --> ECR
-    CD --> SSM
-    SSM --> SSM_Agent
-    SSM_Agent --> DeployScript
-    DeployScript --> Docker
-    Docker --> App
-    Nginx --> App
-    EC2 --> CloudWatch
+    subgraph AWS_Tier["Optional Enterprise Architecture (AWS)"]
+        AWSOIDC["AWS IAM OIDC Federation"]
+        ECR["Amazon ECR (SHA-tagged images)"]
+        EC2["AWS EC2 Host + SSM + Nginx Proxy"]
+        CloudWatch["Amazon CloudWatch (Metrics & Logs)"]
+    end
+
+    Code --> Git
+    Git --> GHPush
+    GHPush --> CI_Pipeline
+    CI_Pipeline -->|Passes All Checks| CD_Pipeline
+    CD_Pipeline --> RenderService
+    RenderService --> GunicornWSGI
+    GunicornWSGI --> LiveApp
+
+    CI_Pipeline -.->|Optional Manual Trigger| AWSOIDC
+    AWSOIDC -.-> ECR
+    ECR -.-> EC2
+    EC2 -.-> CloudWatch
 ```
 
 ---
 
-## 6. Project Directory Structure
+## 6. Directory Structure
 
 ```
 CloudDeploy/
-│
-├── app/                                 # Flask Application Core
-│   ├── __init__.py                      # Application Factory & Error Handlers
-│   ├── config.py                        # Environment Configurations
-│   ├── routes.py                        # HTTP Route Handlers & Health Probes
-│   ├── templates/                       # Jinja2 Modular HTML Templates
-│   │   ├── base.html                    # Base layout with navbar & live status
-│   │   ├── index.html                   # Home Dashboard & KPI Cards
-│   │   ├── dashboard.html               # Deployment & Diagnostic Panel
-│   │   ├── about.html                   # Architecture Specification
-│   │   ├── 404.html                     # Custom 404 Not Found Page
-│   │   └── 500.html                     # Custom 500 Internal Error Page
-│   └── static/                          # Static Assets
-│       ├── css/style.css                # Dark mode styling & animations
-│       └── js/main.js                   # Client-side health monitoring & AJAX
-│
-├── tests/                               # Automated Test Suite
-│   ├── conftest.py                      # Pytest Fixtures & Client Setup
-│   ├── test_app.py                      # Route, UI, and Error Handler Tests
-│   └── test_health.py                   # Health & Non-Sensitive API Tests
-│
-├── nginx/
-│   └── nginx.conf                       # Production Nginx Reverse Proxy Config
-│
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml                       # CI: Linting, Pytest & Docker Build
-│       └── cd.yml                       # CD: AWS OIDC, ECR, SSM & Health Check
+│       ├── ci.yml                       # CI: Linting, Pytest (100% Coverage), Docker Build & Compose Probe
+│       ├── cd.yml                       # CD: Render Cloud Automated Deployment & Health Verification
+│       └── aws-deploy-optional.yml      # Optional: Manual AWS OIDC, ECR & EC2 SSM Deployment Workflow
+│
+├── app/
+│   ├── __init__.py                      # Flask Application Factory & Security Headers
+│   ├── config.py                        # Multi-Environment Configuration Management
+│   ├── routes.py                        # REST API Endpoints, Telemetry & Dashboard Logic
+│   ├── static/
+│   │   ├── css/style.css                # Dark-Mode Modern Bootstrap Styling
+│   │   └── js/main.js                   # Client-Side AJAX Health & Log Stream Poller
+│   └── templates/
+│       ├── base.html                    # Base Template with Navigation & Footer
+│       ├── index.html                   # Home Dashboard & Quick Status KPI Cards
+│       ├── dashboard.html               # Comprehensive Monitoring Dashboard (Sections A-H)
+│       ├── about.html                   # Architecture & Security Specification Page
+│       ├── 404.html                     # Custom 404 Not Found Page
+│       └── 500.html                     # Custom 500 Internal Error Page
 │
 ├── deployment/
-│   ├── aws/
-│   │   ├── github-oidc-trust-policy.json # AWS OIDC Trust Relationship
+│   ├── aws/                             # Optional Enterprise AWS Infrastructure Code
+│   │   ├── github-oidc-trust-policy.json# AWS IAM OIDC Trust Relationship
 │   │   ├── iam-policy.json              # GitHub Actions Deployment Role Policy
 │   │   ├── ec2-trust-policy.json        # EC2 Trust Policy
 │   │   ├── ec2-instance-policy.json     # EC2 IAM Instance Profile Policy
-│   │   ├── ec2-user-data.sh             # EC2 Host Bootstrap Script
+│   │   ├── ec2-user-data.sh             # EC2 Host Bootstrap Script (Docker + Nginx + SSM)
 │   │   ├── deploy.sh                    # Zero-Downtime Rollout Handler
 │   │   ├── rollback.sh                  # Automated Rollback Handler
 │   │   ├── cleanup.sh                   # Zero-Cost Resource Teardown Script
 │   │   └── cloudwatch-agent-config.json # CloudWatch Metrics & Logs Config
 │   └── scripts/
-│       ├── ecr-setup.sh                 # ECR Setup with Lifecycle Policies
-│       ├── local-test.sh                # Local Test & Lint Runner
-│       └── smoke-test.sh                # HTTP Smoke Test Runner
+│       ├── ecr-setup.sh                 # Amazon ECR Automated Provisioning Script
+│       ├── local-test.sh                # Local Virtualenv Test Runner
+│       └── smoke-test.sh                # HTTP Probe Smoke Test Utility
 │
-├── Dockerfile                           # Production Non-Root Container Spec
-├── docker-compose.yml                   # Local Multi-Container Orchestration
-├── requirements.txt                     # Production Python Dependencies
-├── requirements-dev.txt                 # Development & Testing Dependencies
-├── .dockerignore                        # Docker Build Exclusion Rules
-├── .gitignore                           # Git Exclusion Rules
+├── docs/
+│   ├── ARCHITECTURE.md                  # Comprehensive System Architecture Specification
+│   ├── DEPLOYMENT.md                    # Production Render & Local Docker Deployment Guide
+│   ├── TESTING.md                       # Test Strategy, Categories & 100% Coverage Matrix
+│   ├── SECURITY.md                      # Security Audit, Non-Root UID & OIDC Specification
+│   └── screenshots/
+│       └── README.md                    # Visual Evidence Catalog & Screenshot Instructions
+│
+├── nginx/
+│   └── nginx.conf                       # Production Nginx Reverse Proxy Configuration
+│
+├── tests/
+│   ├── conftest.py                      # Pytest Fixtures & Flask Test Client Setup
+│   ├── test_app.py                      # Routes, APIs, Telemetry, Cache & Error Tests
+│   └── test_health.py                   # Health & Non-Sensitive API Tests
+│
+├── .dockerignore                         # Docker Build Exclusion Rules
 ├── .env.example                         # Environment Variables Template
-├── README.md                            # Comprehensive Engineering Guide
-├── LICENSE                              # MIT Open Source License
-└── PROJECT_PROGRESS.md                  # Implementation & Verification Tracking
+├── .gitignore                           # Git Exclusion Rules (Secrets, Caches, Venv)
+├── docker-compose.yml                   # Multi-Container Orchestration (App + Nginx)
+├── Dockerfile                           # Hardened Multi-Stage Dockerfile (UID 10001)
+├── LICENSE                              # MIT License
+├── pytest.ini                           # Pytest Configuration (pythonpath = .)
+├── requirements.txt                     # Production Runtime Dependencies
+└── requirements-dev.txt                 # Development, Linting & Testing Dependencies
 ```
 
 ---
 
-## 7. Local Installation & Execution
+## 7. Local Installation Instructions
 
-### 7.1 Running Without Docker (Direct Python Host)
+### Prerequisites
+- Python 3.11+
+- Git 2.30+
+- Docker & Docker Compose (optional for container testing)
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/ullas-reddy-g/CloudDeploy-AWS-CICD.git
-   cd CloudDeploy-AWS-CICD
-   ```
+### Step-by-Step Setup
+```powershell
+# 1. Clone repository
+git clone https://github.com/ullas-reddy-g/CloudDeploy-AWS-CICD.git
+cd CloudDeploy
 
-2. **Create and activate a virtual environment**:
-   ```bash
-   python -m venv venv
-   # On Linux/macOS:
-   source venv/bin/activate
-   # On Windows:
-   .\venv\Scripts\activate
-   ```
+# 2. Create and activate a Python virtual environment
+python -m venv venv
+.\venv\Scripts\Activate.ps1    # On Windows
+# source venv/bin/activate      # On Linux/macOS
 
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements-dev.txt
-   ```
-
-4. **Run the development server**:
-   ```bash
-   flask --app "app:create_app('development')" run --port 8000
-   ```
-   Open your browser at `http://localhost:8000`.
-
----
-
-### 7.2 Running With Docker & Docker Compose
-
-To run the complete production multi-container setup (Flask/Gunicorn + Nginx reverse proxy):
-
-```bash
-docker compose up --build
+# 3. Install dependencies
+python -m pip install --upgrade pip
+pip install -r requirements-dev.txt
 ```
 
-- Web Application & Proxy: `http://localhost` (Port 80)
-- Health Check Probe: `http://localhost/health`
-- API Information: `http://localhost/api/info`
+---
+
+## 8. Running Flask Locally
+
+Start the local development server:
+```powershell
+python -c "from app import create_app; app = create_app('development'); app.run(host='0.0.0.0', port=8000, debug=True)"
+```
+Open your browser at: `http://localhost:8000`.
 
 ---
 
-## 8. Automated Testing & Verification
+## 9. Docker Build and Run Commands
 
-The project includes automated tests covering route responses, health payload format, API security, error handlers, and security headers.
-
-### Execute Test Suite:
+Build and run the application using the production Dockerfile:
 ```bash
+# Build the Docker image
+docker build -t clouddeploy:latest .
+
+# Run the container in the background
+docker run -d --name clouddeploy-app -p 8000:8000 clouddeploy:latest
+
+# Probe the container health endpoint
+curl -i http://localhost:8000/health
+
+# Verify unprivileged user execution (UID 10001)
+docker exec clouddeploy-app id -u
+# Returns: 10001
+
+# Inspect container logs
+docker logs clouddeploy-app
+
+# Clean up
+docker stop clouddeploy-app && docker rm clouddeploy-app
+```
+
+---
+
+## 10. Docker Compose Instructions
+
+Run the full multi-container production stack including Nginx reverse proxy:
+```bash
+# Start all services with automated build
+docker compose up -d --build
+
+# View container status and health dependencies
+docker compose ps
+
+# Probe the Nginx edge reverse proxy on port 80
+curl -i http://localhost:80/health
+
+# View live reverse proxy and application logs
+docker compose logs -f
+
+# Shut down and remove containers and network
+docker compose down
+```
+
+---
+
+## 11. GitHub Actions CI/CD Pipeline
+
+The Continuous Integration pipeline ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) automatically triggers on every push and pull request targeting the `main` branch.
+
+### CI Stages
+1. **Lint & Pytest Suite:**
+   - Checks out code with `actions/checkout@v4`.
+   - Configures Python 3.11 with pip caching via `actions/setup-python@v5`.
+   - Runs Flake8 syntax checks and PEP8 style enforcement with 0 allowed errors.
+   - Executes Pytest with mandatory 80% coverage threshold (**100% statement coverage achieved**).
+2. **Container Build & Runtime Verification (`needs: lint-and-test`):**
+   - Builds container image with `docker/build-push-action@v5`.
+   - Starts standalone container and validates HTTP 200 on `/health`.
+   - Asserts non-root user execution (`UID 10001`).
+   - Launches Docker Compose orchestration (Web + Nginx) and validates reverse proxy connectivity on port 80.
+   - Cleans up all testing containers.
+
+---
+
+## 12. Render Cloud Deployment Instructions
+
+The Continuous Deployment pipeline ([`.github/workflows/cd.yml`](.github/workflows/cd.yml)) runs automatically after the CI pipeline succeeds.
+
+### Deployment Workflow
+1. **Automatic Git-Push Rollout:** Render detects pushes to `main` and automatically builds and deploys the container.
+2. **CI-Gated Deploy Hook (Optional):** If secret `RENDER_DEPLOY_HOOK` is configured, GitHub Actions triggers the deployment hook via POST request and probes `https://clouddeploy-aws-cicd.onrender.com/health` to confirm rollout.
+
+---
+
+## 13. Environment Variables Reference
+
+| Variable | Default Value | Description |
+|---|---|---|
+| `ENVIRONMENT` | `production` | Active environment profile (`production`, `development`, `testing`) |
+| `PORT` | `8000` | Application HTTP listening port |
+| `APP_NAME` | `CloudDeploy` | User-facing application branding name |
+| `APP_VERSION` | `1.0.0` | Semantic release version |
+| `HOSTING_PROVIDER` | `render` (in cloud) / `local` | Host platform indicator displayed on dashboard |
+| `RENDER_EXTERNAL_URL` | `https://clouddeploy-aws-cicd.onrender.com` | Public production application URL |
+| `RENDER_GIT_COMMIT` | `local-build` | Git commit SHA automatically injected by Render runtime |
+| `GITHUB_REPOSITORY` | `ullas-reddy-g/CloudDeploy-AWS-CICD` | Repository used for GitHub Actions API telemetry |
+| `GITHUB_TOKEN` | *(Optional)* | Personal access token for higher GitHub API rate limits |
+| `RENDER_API_KEY` | *(Optional)* | Render REST API key for deployment history integration |
+| `RENDER_SERVICE_ID` | *(Optional)* | Render Web Service ID for deployment history queries |
+
+---
+
+## 14. Dashboard Functionality
+
+The monitoring dashboard ([`/deployment`](https://clouddeploy-aws-cicd.onrender.com/deployment)) provides structured operational insights across eight dedicated sections:
+
+- **Section A: System Overview:** Service health badge, hosting provider, active commit tag, and uptime.
+- **Section B: Docker Container Monitoring:** Execution mode, unprivileged non-root user (UID 10001), WSGI worker threads, and memory usage.
+- **Section C: Cloud Infrastructure Diagnostics:** Render production host status and optional AWS architecture reference.
+- **Section D: CI/CD Automation Pipeline:** Real-time GitHub Actions telemetry querying the official GitHub REST API (workflow names, branches, commit SHAs, status, conclusion, and run duration).
+- **Section E: Deployment History:** Real-time Render deployment status and filesystem deployment records.
+- **Section F: Recent Application Logs:** In-memory ring buffer log stream with automatic credential redaction.
+- **Section G: Real-Time Alerts:** Automated evaluations of storage capacity (>85%), CI build results, and container execution.
+- **Section H: Architecture & Topology Flow:** End-to-end visual diagram showing code progression from developer commit to live Render hosting.
+
+---
+
+## 15. REST API Documentation
+
+| Method | Endpoint | Description | Sample Output |
+|---|---|---|---|
+| `GET` | `/health` | Container and load-balancer health probe | `{"status": "healthy", "version": "1.0.0", "uptime_seconds": 120, "timestamp": "..."}` |
+| `GET` | `/api/info` | Non-sensitive operational metadata | `{"app_name": "CloudDeploy", "environment": "production", "status": "operational", ...}` |
+| `GET` | `/api/github/workflows` | Live GitHub Actions workflow telemetry | `{"integration_status": "connected", "workflow_runs": [...], "rate_limit_remaining": "59"}` |
+| `GET` | `/api/deployments` | Render deployment status & history | `{"integration_status": "unconfigured", "provider": "Render", "deployments": [...]}` |
+| `GET` | `/api/monitoring` | Consolidated system & container metrics | `{"system": {...}, "docker": {...}, "hosting": {...}, "status": "healthy"}` |
+| `GET` | `/api/system-metrics` | Hardware storage and CPU statistics | `{"system": {"disk_used_pct": 42.1, "cpu_count": 4}, "uptime_seconds": 120}` |
+| `GET` | `/api/logs` | Sanitized in-memory log stream | `{"logs": [{"timestamp": "...", "level": "INFO", "message": "..."}], "count": 10}` |
+| `GET` | `/api/alerts` | Active evaluated alerts list | `{"alerts": [...], "count": 1}` |
+
+---
+
+## 16. Testing Instructions
+
+Execute the complete test suite locally:
+```powershell
+# Run all 37 tests with statement coverage
 python -m pytest -v --cov=app --cov-report=term-missing
+
+# Run style and PEP8 quality checks
+python -m flake8 app/ tests/ --count --max-line-length=120 --statistics
 ```
-
-### Run Code Style Linting:
-```bash
-python -m flake8 app/ tests/ --max-line-length=120
-```
-
-### Verified Test Results:
-```text
-tests/test_app.py::test_homepage_status_and_content PASSED               [  3%]
-tests/test_app.py::test_deployment_page PASSED                           [  7%]
-tests/test_app.py::test_about_page PASSED                                [ 11%]
-tests/test_app.py::test_404_not_found_html PASSED                        [ 14%]
-tests/test_app.py::test_404_not_found_json PASSED                        [ 18%]
-tests/test_app.py::test_500_error_handling_json PASSED                   [ 22%]
-tests/test_app.py::test_500_error_handling_html PASSED                   [ 25%]
-tests/test_app.py::test_error_trigger_forbidden_when_not_debug PASSED    [ 29%]
-tests/test_app.py::test_security_headers_present PASSED                  [ 33%]
-tests/test_app.py::test_api_system_metrics PASSED                        [ 37%]
-tests/test_app.py::test_api_logs PASSED                                  [ 40%]
-tests/test_app.py::test_get_uptime_seconds_helper PASSED                 [ 44%]
-tests/test_app.py::test_is_running_in_docker_helper PASSED               [ 48%]
-tests/test_app.py::test_get_system_metrics_fallback PASSED               [ 51%]
-tests/test_app.py::test_get_aws_cloud_status_connected PASSED            [ 55%]
-tests/test_app.py::test_get_aws_cloud_status_unconnected PASSED          [ 59%]
-tests/test_app.py::test_get_cicd_pipeline_status_connected PASSED        [ 62%]
-tests/test_app.py::test_get_cicd_pipeline_status_fallback PASSED         [ 66%]
-tests/test_app.py::test_get_deployment_history_file PASSED               [ 70%]
-tests/test_app.py::test_get_deployment_history_corrupted_fallback PASSED [ 74%]
-tests/test_app.py::test_disk_alert_rendered_in_dashboard PASSED          [ 77%]
-tests/test_app.py::test_recent_logs_handler_error_handling PASSED        [ 81%]
-tests/test_app.py::test_create_app_env_overrides PASSED                  [ 85%]
-tests/test_app.py::test_create_app_default_config PASSED                 [ 88%]
-tests/test_health.py::test_health_endpoint_status PASSED                 [ 92%]
-tests/test_health.py::test_health_endpoint_payload PASSED                [ 96%]
-tests/test_health.py::test_api_info_endpoint PASSED                      [100%]
-
----------- coverage: platform win32, python 3.11.5 -----------
-Name              Stmts   Miss  Cover
--------------------------------------
-app\__init__.py      67      0   100%
-app\config.py        26      0   100%
-app\routes.py       120      0   100%
--------------------------------------
-TOTAL               213      0   100%
-
-============================= 27 passed in 1.72s ==============================
-Coverage: 100% (213 / 213 statements)
-Flake8 Violations: 0
-```
-
-### Verification Status Matrix
-
-| Component | Verification Tier | Detail |
-|---|---|---|
-| **Flask Web App** | **LOCALLY VERIFIED** | Tested via Pytest test client across all routes and error scenarios. |
-| **Frontend UI** | **LOCALLY VERIFIED** | Tested templates, CSS styling, AJAX health polling, and diagnostics. |
-| **Automated Tests** | **LOCALLY VERIFIED** | 27/27 tests passing, 100% statement coverage (213/213 statements), 0 Flake8 violations. |
-| **Docker Build** | **IMPLEMENTED** | Multi-stage Dockerfile verified; automated build & runtime test in CI workflow. |
-| **Docker Compose** | **IMPLEMENTED** | Multi-container compose verified; automated proxy test in CI workflow. |
-| **Git Repository** | **LOCALLY VERIFIED** | Local repository on `main` branch with clean history and secret exclusion. |
-| **CI Workflow** | **IMPLEMENTED** | `.github/workflows/ci.yml` validates lint, tests, coverage, container & Compose. |
-| **CD Workflow** | **IMPLEMENTED** | `.github/workflows/cd.yml` with OIDC auth, ECR push, SSM rollout & rollback. |
-| **Amazon ECR** | **IMPLEMENTED** | Automated creation script with AES-256 encryption & 10-image lifecycle policy. |
-| **AWS EC2 Bootstrap** | **IMPLEMENTED** | Self-contained user-data script with embedded rollout and rollback scripts. |
-| **CloudWatch Observability** | **IMPLEMENTED** | Metrics and JSON log stream collection configurations prepared. |
+See [docs/TESTING.md](docs/TESTING.md) for full coverage breakdown.
 
 ---
 
-## 9. AWS Infrastructure & CI/CD Pipeline
+## 17. Security Features
 
-For a complete walkthrough of configuring AWS, refer to [docs/deployment-guide.md](docs/deployment-guide.md).
-
-### 9.1 Zero Long-Lived Credentials (AWS OIDC)
-CloudDeploy uses GitHub Actions OIDC federation. When the CD workflow runs:
-1. GitHub generates an OIDC token signed by GitHub's cryptographic key.
-2. The workflow requests temporary AWS credentials via `sts:AssumeRoleWithWebIdentity`.
-3. AWS STS validates the token against the IAM Trust Policy (`deployment/aws/github-oidc-trust-policy.json`).
-4. Short-lived session credentials (valid for 1 hour) are issued to perform the ECR push and SSM deployment.
-
-### 9.2 Amazon ECR Provisioning
-Run the automated script to provision the registry with lifecycle retention:
-```bash
-./deployment/scripts/ecr-setup.sh clouddeploy us-east-1
-```
-
-### 9.3 AWS EC2 Deployment with SSM & Rollback
-The deployment script (`deployment/aws/deploy.sh`) operates as follows:
-1. Saves previous container tag in `previous_tag.txt`.
-2. Pulls new image tag from Amazon ECR.
-3. Launches container and runs health checks against `GET http://localhost:8000/health`.
-4. If healthy: updates `current_tag.txt` and completes successfully.
-5. If unhealthy: executes `deployment/aws/rollback.sh` to restore the previous container version automatically.
+- **Zero Hardcoded Secrets:** No API keys, AWS credentials, or tokens stored in source code.
+- **Non-Root Execution:** Dedicated user `clouddeploy` (UID 10001) in Dockerfile.
+- **Log Scrubbing:** Automatic redaction of sensitive environment tokens in `/api/logs`.
+- **Security Headers:** Injected `X-Frame-Options`, `X-Content-Type-Options`, and `X-XSS-Protection`.
+- **Protected Endpoints:** Debug and test-trigger routes strictly forbidden in production.
+See [docs/SECURITY.md](docs/SECURITY.md) for detailed audit results.
 
 ---
 
-## 10. Centralized CloudWatch Monitoring
+## 18. Known Limitations
 
-- **Operating System Metrics**: CPU utilization, memory used/available percentage, disk space on root volume.
-- **Log Streaming**:
-  - `/aws/ec2/clouddeploy/nginx/access` (JSON structured access logs)
-  - `/aws/ec2/clouddeploy/nginx/error` (Nginx warnings & errors)
-  - `/aws/ec2/clouddeploy/deployment` (Rollout & rollback logs)
-- **Alarms**: High CPU utilization (>80%) and EC2 StatusCheckFailed alarms configured via AWS CLI.
+- **Render Free Tier Cold Starts:** Free tier web services spin down after 15 minutes of inactivity; initial requests after idle may take 30–50 seconds to warm up.
+- **GitHub API Rate Limits:** Unauthenticated public requests to GitHub Actions API are limited to 60 requests per hour per IP. CloudDeploy implements an in-memory 30-second cache to prevent rate-limiting.
+- **Container Host Metrics on PaaS:** Operating system memory and CPU percentages are restricted by container sandboxes on serverless/PaaS platforms and are reported honestly as "unavailable".
 
 ---
 
-## 11. Security & Hardening Features
+## 19. Project Evidence & Screenshots
 
-- **Non-Root Execution**: Docker container runs as unprivileged user `clouddeploy` (UID 10001).
-- **Least-Privilege IAM**: Policies are scoped strictly to the required ECR repository and EC2 instance resources.
-- **No Sensitive Information Leaks**: `/api/info` and `/health` expose only safe runtime metadata; secrets and internal VPC IPs are omitted.
-- **Defensive HTTP Headers**: Responses include `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, and `X-XSS-Protection: 1; mode=block`.
-- **Zero Committed Secrets**: `.env` and sensitive key files are excluded by `.gitignore` and `.dockerignore`.
-
----
-
-## 12. Troubleshooting & FAQ
-
-| Issue | Cause | Solution |
-|---|---|---|
-| `403 AccessDenied` on ECR push | OIDC role trust policy mismatch | Ensure the GitHub repository name and branch in `github-oidc-trust-policy.json` match your GitHub repository exactly. |
-| Container fails health check | Port mismatch or missing environment | Check `/var/log/clouddeploy-deploy.log` on the EC2 host. Verify Gunicorn is listening on port 8000. |
-| SSM Command returns `InvalidInstanceId` | Instance lacks SSM Agent or role | Verify `CloudDeploy-EC2-Profile` is attached to the EC2 instance and SSM agent service is running (`systemctl status snap.amazon-ssm-agent.amazon-ssm-agent`). |
+Visual validation evidence is cataloged in [`docs/screenshots/`](docs/screenshots/README.md):
+- `dashboard.png`: Live production monitoring dashboard.
+- `deployment-info.png`: API metadata and health probe responses.
+- `architecture.png`: Architecture specification and security strategy.
+- `github-actions-ci.png`: Passing GitHub Actions CI pipeline execution.
+- `render-live-deployment.png`: Render Cloud Web Service deployment console.
+- `docker-runtime.png`: Local Docker Compose and Nginx reverse proxy verification.
 
 ---
 
-## 13. Cloud Cost Analysis & Safety Controls
+## 20. Future Enhancements
 
-| Resource | Service Tier / Size | Estimated Cost (us-east-1) |
-|---|---|---|
-| **AWS EC2** | `t3.micro` (1 vCPU, 1 GB RAM) | Free Tier eligible (750 hrs/month) or ~\$0.0104/hr (<\$0.05 for 4-hr demo) |
-| **Amazon ECR** | Private repository (<1 GB storage) | Free Tier eligible (500 MB) or ~\$0.06/month with 10-image lifecycle policy |
-| **AWS Systems Manager** | SSM Run Command & Session Manager | **\$0.00 (Free of charge)** |
-| **AWS IAM & OIDC** | WebIdentity federation & roles | **\$0.00 (Free of charge)** |
-| **Networking** | Direct Internet Gateway (No NAT Gateway) | **\$0.00 (Saves ~\$32/month over NAT Gateways)** |
-| **Amazon CloudWatch** | Basic metrics & <5 GB logs/month | Free Tier eligible or <\$0.10 |
-| **Total Test Run** | Complete end-to-end deployment run | **<\$0.10 total (zero ongoing cost with cleanup)** |
-
----
-
-## 14. Resource Cleanup (Zero Lingering Cost)
-
-To ensure zero ongoing cloud charges when you finish testing:
-```bash
-./deployment/aws/cleanup.sh us-east-1
-```
-This utility cleanly terminates EC2 instances, deletes security groups, empties and deletes the ECR repository, and detaches IAM policies.
-
----
-
-## 15. License
-
-This project is licensed under the [MIT License](LICENSE).
+1. **Prometheus & Grafana:** Integrate Prometheus metrics exporter on `/metrics` for enterprise dashboarding.
+2. **Kubernetes Helm Charts:** Author Kubernetes Helm charts for deployment on AWS EKS or Minikube.
+3. **Automated Dynamic Secret Rotation:** Integrate HashiCorp Vault or AWS Secrets Manager for ephemeral database credentials.

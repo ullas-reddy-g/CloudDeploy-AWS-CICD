@@ -8,7 +8,7 @@
     <div class="col-12">
         <div class="pb-3 border-bottom border-secondary">
             <h2 class="fw-bold text-white mb-1">Architecture & Engineering Specification</h2>
-            <p class="text-secondary mb-0">Overview of the containerization stack, automated CI/CD pipeline, and AWS cloud topology.</p>
+            <p class="text-secondary mb-0">Overview of the containerization stack, automated CI/CD pipeline, Render production hosting, and optional AWS cloud topology.</p>
         </div>
     </div>
 
@@ -21,9 +21,9 @@
             <div class="card-body">
                 <ul class="list-unstyled mb-0 d-flex flex-column gap-2 small">
                     <li><strong class="text-white">Python 3.11+:</strong> Robust runtime environment.</li>
-                    <li><strong class="text-white">Flask 3.0+:</strong> Lightweight, modular web framework.</li>
+                    <li><strong class="text-white">Flask 3.0+:</strong> Lightweight, modular web framework with application factory pattern.</li>
                     <li><strong class="text-white">Gunicorn 22.0:</strong> Production-grade WSGI server running multiple worker processes with asynchronous timeouts.</li>
-                    <li><strong class="text-white">Pytest:</strong> Automated unit, integration, and HTTP endpoint test suite.</li>
+                    <li><strong class="text-white">Pytest & Flake8:</strong> Automated unit, integration, and PEP8 style enforcement.</li>
                 </ul>
             </div>
         </div>
@@ -36,7 +36,7 @@
             </div>
             <div class="card-body">
                 <ul class="list-unstyled mb-0 d-flex flex-column gap-2 small">
-                    <li><strong class="text-white">Docker:</strong> Multi-layer containerization with non-root security execution.</li>
+                    <li><strong class="text-white">Docker:</strong> Multi-layer containerization with unprivileged non-root user (UID 10001).</li>
                     <li><strong class="text-white">Docker Compose:</strong> Multi-container orchestration linking the application container with the reverse proxy.</li>
                     <li><strong class="text-white">Nginx:</strong> Edge reverse proxy handling client requests, security headers, buffering, and SSL termination.</li>
                 </ul>
@@ -47,14 +47,13 @@
     <div class="col-lg-4 col-md-12">
         <div class="card border-secondary h-100">
             <div class="card-header bg-surface border-bottom border-secondary py-3">
-                <h5 class="card-title mb-0 text-white"><i class="bi bi-cloud-check-fill text-warning me-2"></i> AWS Cloud & CI/CD</h5>
+                <h5 class="card-title mb-0 text-white"><i class="bi bi-cloud-check-fill text-success me-2"></i> Cloud Hosting & CI/CD</h5>
             </div>
             <div class="card-body">
                 <ul class="list-unstyled mb-0 d-flex flex-column gap-2 small">
-                    <li><strong class="text-white">GitHub Actions:</strong> Automated CI test execution and OIDC authenticated CD deployment.</li>
-                    <li><strong class="text-white">Amazon ECR:</strong> Secure container image registry storing immutable deployment tags.</li>
-                    <li><strong class="text-white">AWS EC2:</strong> Ubuntu host running Docker engine and IAM instance profile.</li>
-                    <li><strong class="text-white">AWS CloudWatch:</strong> Consolidated system metrics, alarms, and container log streaming.</li>
+                    <li><strong class="text-white">GitHub Actions CI:</strong> Automated linting, test suite execution with 100% statement coverage, and Docker build/runtime verification.</li>
+                    <li><strong class="text-white">Render Cloud (Live Host):</strong> Automated deployment pipeline hosting the containerized application on Render Free Tier.</li>
+                    <li><strong class="text-white">AWS (Optional Extension):</strong> Production-ready IAM OIDC trust policies, ECR provisioning scripts, EC2 user-data bootstrap, and CloudWatch agent configurations.</li>
                 </ul>
             </div>
         </div>
@@ -71,7 +70,7 @@
                     <div class="col-md-6">
                         <h6 class="text-white fw-bold mb-2">Zero Long-Lived Credentials</h6>
                         <p class="text-secondary small mb-0">
-                            GitHub Actions connects to AWS using OpenID Connect (OIDC) identity federation, requesting short-lived STS tokens bound specifically to the GitHub repository and branch name. No AWS access keys are stored in GitHub Secrets.
+                            The repository and CI/CD workflows store zero hardcoded secrets. All external deployments rely on automated Git-push synchronization or secured deploy hooks, and optional AWS configurations leverage OpenID Connect (OIDC) identity federation with STS tokens.
                         </p>
                     </div>
                     <div class="col-md-6">
@@ -81,15 +80,15 @@
                         </p>
                     </div>
                     <div class="col-md-6">
-                        <h6 class="text-white fw-bold mb-2">IAM Instance Profiles</h6>
+                        <h6 class="text-white fw-bold mb-2">Log Sanitization & Privacy</h6>
                         <p class="text-secondary small mb-0">
-                            The EC2 deployment instance uses an attached IAM role with strictly scoped read-only ECR permissions (`ecr:GetAuthorizationToken`, `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`) avoiding hardcoded API credentials on the server.
+                            The in-memory logging buffer filters and redacts any potential sensitive tokens or environment secrets before exposing entries via <code>/api/logs</code>.
                         </p>
                     </div>
                     <div class="col-md-6">
-                        <h6 class="text-white fw-bold mb-2">Automated Rollback Safeguard</h6>
+                        <h6 class="text-white fw-bold mb-2">Automated Rollback & Health Verification</h6>
                         <p class="text-secondary small mb-0">
-                            Deployment scripts perform health probe validation on <code>GET /health</code> before retiring previous instances, automatically reverting to the last verified image if a failure occurs.
+                            All deployment workflows and host scripts perform health probe validation on <code>GET /health</code> before declaring a rollout successful, alerting on failures and enabling rapid rollback.
                         </p>
                     </div>
                 </div>
